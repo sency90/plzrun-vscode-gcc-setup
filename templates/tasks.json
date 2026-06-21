@@ -1,0 +1,53 @@
+{
+    // plzrun-vscode-gcc-setup — sw_expert C/C++ 빌드 태스크
+    //   exam:    -std=c++14 -O0   (실제 시험 옵션, 타임 측정용)
+    //   release: -std=c++14 -O2   (빠른 실행 확인용)
+    //   debug:   -std=c++14 -g    (F5 디버깅용)
+    //   대상: main.cpp + user.cpp 만 컴파일 (같은 폴더 다른 .cpp 와 충돌 방지)
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build exam (-std=c++14 -O0)",
+            "type": "shell",
+            "command": "g++",
+            "args": ["-std=c++14", "-O0", "main.cpp", "user.cpp", "-o", "pgm_exam"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": ["$gcc"],
+            "group": "build"
+        },
+        {
+            "label": "build release (-std=c++14 -O2)",
+            "type": "shell",
+            "command": "g++",
+            "args": ["-std=c++14", "-O2", "main.cpp", "user.cpp", "-o", "pgm_release"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": ["$gcc"],
+            "group": { "kind": "build", "isDefault": true }
+        },
+        {
+            "label": "build debug (-std=c++14 -g)",
+            "type": "shell",
+            "command": "g++",
+            "args": ["-std=c++14", "-g", "main.cpp", "user.cpp", "-o", "pgm_debug"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": ["$gcc"],
+            "group": "build"
+        },
+        {
+            "label": "run release",
+            "type": "shell",
+            "command": "./pgm_release",
+            "options": { "cwd": "${workspaceFolder}" },
+            "dependsOn": "build release (-std=c++14 -O2)",
+            "problemMatcher": []
+        },
+        {
+            "label": "run exam (timed)",
+            "type": "shell",
+            "command": "time ./pgm_exam",
+            "options": { "cwd": "${workspaceFolder}" },
+            "dependsOn": "build exam (-std=c++14 -O0)",
+            "problemMatcher": []
+        }
+    ]
+}

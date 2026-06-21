@@ -1,0 +1,7 @@
+# 빌드 산출물 (생성기는 소스만)
+pgm_exam
+pgm_release
+pgm_debug
+*.o
+*.obj
+*.bak
