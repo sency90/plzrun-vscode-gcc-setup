@@ -24,13 +24,15 @@ plzrun-vscode-gcc-setup       # 현재 폴더에 ./.vscode/ 생성
 
 | 용도 | 명령 | 산출물 |
 |---|---|---|
-| **exam** (시험 옵션, 타임 측정) | `g++ -std=c++14 -O0 main.cpp user.cpp -o pgm_exam` | `pgm_exam` |
-| **release** (빠른 실행 확인) | `g++ -std=c++14 -O2 main.cpp user.cpp -o pgm_release` | `pgm_release` |
-| **debug** (F5 디버깅) | `g++ -std=c++14 -g main.cpp user.cpp -o pgm_debug` | `pgm_debug` |
+| **exam** (시험 옵션, 타임 측정) | `g++ -std=c++14 -O0 main.cpp ${file} -o pgm_exam` | `pgm_exam` |
+| **release** (빠른 실행 확인) | `g++ -std=c++14 -O2 main.cpp ${file} -o pgm_release` | `pgm_release` |
+| **debug** (F5 디버깅) | `g++ -std=c++14 -g main.cpp ${file} -o pgm_debug` | `pgm_debug` |
 
+- 컴파일 대상 = **`main.cpp`(불변) + 편집기에서 지금 포커스한 파일 `${file}`**.
+  예: `score_455_mojo.cpp` 탭을 보고 있으면 그 파일이 컴파일됨 (`user.cpp` 고정 아님).
+  ⚠️ 풀이 `.cpp` 를 **활성 탭**으로 둔 채 빌드/F5 (main.cpp 를 포커스하면 중복 컴파일됨).
 - `Ctrl+Shift+B` → **build release** (기본)
 - 터미널 태스크: `run exam (timed)` = `time ./pgm_exam`, `run release` 등
-- 컴파일 대상은 **`main.cpp` + `user.cpp` 만** (같은 폴더의 다른 `.cpp` 와 충돌 방지)
 
 ## 디버깅 (`.vscode/launch.json`)
 

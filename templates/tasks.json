@@ -3,14 +3,16 @@
     //   exam:    -std=c++14 -O0   (실제 시험 옵션, 타임 측정용)
     //   release: -std=c++14 -O2   (빠른 실행 확인용)
     //   debug:   -std=c++14 -g    (F5 디버깅용)
-    //   대상: main.cpp + user.cpp 만 컴파일 (같은 폴더 다른 .cpp 와 충돌 방지)
+    //   대상: main.cpp(불변) + 지금 편집기에서 포커스한 파일 ${file}
+    //         (score_455_mojo.cpp 를 보고 있으면 그게 컴파일됨. user.cpp 고정 아님)
+    //   ※ 풀이 .cpp 를 활성 탭으로 둔 채 빌드/F5 하세요 (main.cpp 를 포커스하면 중복됨)
     "version": "2.0.0",
     "tasks": [
         {
             "label": "build exam (-std=c++14 -O0)",
             "type": "shell",
             "command": "g++",
-            "args": ["-std=c++14", "-O0", "main.cpp", "user.cpp", "-o", "pgm_exam"],
+            "args": ["-std=c++14", "-O0", "main.cpp", "${file}", "-o", "pgm_exam"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": ["$gcc"],
             "group": "build"
@@ -19,7 +21,7 @@
             "label": "build release (-std=c++14 -O2)",
             "type": "shell",
             "command": "g++",
-            "args": ["-std=c++14", "-O2", "main.cpp", "user.cpp", "-o", "pgm_release"],
+            "args": ["-std=c++14", "-O2", "main.cpp", "${file}", "-o", "pgm_release"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": ["$gcc"],
             "group": { "kind": "build", "isDefault": true }
@@ -28,7 +30,7 @@
             "label": "build debug (-std=c++14 -g)",
             "type": "shell",
             "command": "g++",
-            "args": ["-std=c++14", "-g", "main.cpp", "user.cpp", "-o", "pgm_debug"],
+            "args": ["-std=c++14", "-g", "main.cpp", "${file}", "-o", "pgm_debug"],
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": ["$gcc"],
             "group": "build"
