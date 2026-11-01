@@ -39,6 +39,10 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 TPL="$SCRIPT_DIR/templates"
 [ -d "$TPL" ] || { err "templates folder not found: $TPL"; exit 1; }
+# Shift+Esc = Esc: 사용자 keybindings.json 의 vsc 칸 (lib/keybindings.sh)
+KB_LIB="$SCRIPT_DIR/lib/keybindings.sh"
+KB_TSV="$TPL/shift-esc.tsv"
+[ -f "$KB_LIB" ] && . "$KB_LIB"
 
 # ----------------------------------------------------------------------------
 #  문자열 도구
@@ -153,7 +157,7 @@ Options with a value (one dash):
 
 Options without a value (two dashes):
   --init     reset every setting to the default (for a new problem)
-  --remove   delete the files vsc made in .vscode/
+  --remove   delete the files vsc made in .vscode/ (and its Shift+Esc keybindings)
   --ex       use ex mode
   --single   use single-file mode
   --force    replace tasks.json / launch.json even if vsc did not make them
@@ -168,6 +172,10 @@ Examples:
 
 Without [folder], vsc uses the nearest folder above that is already set up
 (so 'vsc -stdin in2' inside poj/14216 changes the poj setup).
+Shift+Esc works like Esc in VSCode for files in a folder set up by vsc
+(Vim insert mode, suggestions, find, multiple cursors, and every other Esc).
+VSCode reads keybindings only from your user keybindings.json, so vsc adds
+a marked part there, limited to these folders; your own entries are kept.
 EOF
 }
 
@@ -344,6 +352,29 @@ CONF="$VSC/$CONF_NAME"
 
 is_ours() { grep -q "$MARK" "$1" 2>/dev/null; }
 
+# shift_esc MODE : 이 폴더(TARGET)를 Shift+Esc 칸에 넣거나(add) 뺀다(remove). 바뀐 것만 SE_NOTE 에
+SE_NOTE=""; SE_WARN=""
+shift_esc() {
+    local kb
+    SE_NOTE=""; SE_WARN=""
+    if ! command -v kb_update >/dev/null 2>&1 || [ ! -f "$KB_TSV" ]; then
+        [ "$1" = add ] && SE_WARN="Shift+Esc was not set up: lib/keybindings.sh or templates/shift-esc.tsv is missing (run install.sh again)"
+        return 0
+    fi
+    kb="$(kb_path)"
+    if [ -z "$kb" ]; then
+        [ "$1" = add ] && SE_WARN="Shift+Esc was not set up (${KB_WHY}); add the keybindings yourself if you need them"
+        return 0
+    fi
+    kb_update "$kb" "$KB_TSV" "$1" "$TARGET"
+    case "$KB_STATUS" in
+        added)   SE_NOTE="keybindings: Shift+Esc now works like Esc in this folder (added to $kb)" ;;
+        removed) SE_NOTE="keybindings: Shift+Esc is back to normal in this folder (removed from $kb)" ;;
+        refused) SE_WARN="Shift+Esc was not set up: $KB_WHY ($kb was not changed)" ;;
+    esac
+    return 0
+}
+
 # ----------------------------------------------------------------------------
 #  --remove
 # ----------------------------------------------------------------------------
@@ -366,6 +397,9 @@ if [ "$F_REMOVE" -eq 1 ]; then
     fi
     for f in $kept; do line "kept $f (not made by vsc)"; done
     if [ -d "$VSC" ] && rmdir "$VSC" 2>/dev/null; then line "removed the empty .vscode/ folder"; fi
+    shift_esc remove
+    [ -n "$SE_NOTE" ] && line "$SE_NOTE"
+    [ -n "$SE_WARN" ] && warn "$SE_WARN"
     [ -n "$removed" ] && line "run '$PROG' to set it up again"
     exit 0
 fi
@@ -530,12 +564,15 @@ mkdir -p "$VSC"
 write_file "$CONF_NAME" "$NEW_CONF"
 write_file tasks.json "$NEW_TASKS"
 write_file launch.json "$NEW_LAUNCH"
+shift_esc add
 
 print_file_notes() {
     [ -n "$W_CREATED" ] && line ".vscode: created ${W_CREATED#, }"
     [ -n "$W_REWROTE" ] && line ".vscode: rewrote ${W_REWROTE#, }"
     [ -n "$W_OLDER" ]   && line ".vscode: updated ${W_OLDER#, } (made by an older version of this tool)"
     [ -n "$W_FOREIGN" ] && line ".vscode: replaced ${W_FOREIGN#, } (not made by vsc; --force)"
+    [ -n "$SE_NOTE" ] && line "$SE_NOTE"
+    [ -n "$SE_WARN" ] && warn "$SE_WARN"
     return 0
 }
 
