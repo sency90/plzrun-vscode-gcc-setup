@@ -19,6 +19,10 @@ mkdir -p "$WORK/bin" "$WORK/ex" "$WORK/poj/$PROB"
 ln -s "$REPO/setup.sh" "$WORK/bin/vsc"
 ln -s "$REPO/setup.sh" "$WORK/bin/plzrun-vscode-gcc-setup"
 export PATH="$WORK/bin:$PATH"
+# Shift+Esc 칸은 시험용 keybindings.json 에만 쓴다 (실제 사용자 파일은 절대 건드리지 않는다)
+mkdir -p "$WORK/kb"
+export VSC_KEYBINDINGS="$WORK/kb/keybindings.json"
+cp "$HERE/fixtures/keybindings-user.jsonc" "$VSC_KEYBINDINGS"
 
 # 복사: ex 는 소스와 기존 .vscode, poj 는 소스와 입력 파일만 (빌드 산출물 제외)
 cp -p "$EX_SRC"/*.cpp "$WORK/ex/"
@@ -143,6 +147,80 @@ run vsc --remove
 mkdir -p .vscode; printf '{ "version": "2.0.0", "tasks": [] }\n' > .vscode/tasks.json
 run vsc --remove
 echo "\$ ls .vscode"; ls .vscode
+
+echo; echo "################ Shift+Esc = Esc (user keybindings.json, test copy: $VSC_KEYBINDINGS)"
+KBC="python3 -I $HERE/kb_check.py"
+KB="$VSC_KEYBINDINGS"
+TSV="$REPO/templates/shift-esc.tsv"
+ORIG="$WORK/kb/orig.json"
+cp "$HERE/fixtures/keybindings-user.jsonc" "$KB"; cp "$KB" "$ORIG"
+same_as() { if cmp -s "$1" "$2"; then echo "same bytes: $(basename "$1") = $(basename "$2")"; else echo "DIFFERENT: $1 $2"; return 1; fi; }
+cd "$WORK/poj"
+run vsc
+run $KBC parse "$KB"
+run $KBC same-user "$KB" "$ORIG"
+run $KBC ours "$KB" "$TSV" "$WORK/poj"
+cp "$KB" "$WORK/kb/after-poj.json"
+run vsc
+run vsc -lang c++17
+run same_as "$KB" "$WORK/kb/after-poj.json"
+cd "$WORK/ex"
+run vsc
+run $KBC ours "$KB" "$TSV" "$WORK/poj" "$WORK/ex"
+run $KBC same-user "$KB" "$ORIG"
+run $KBC simulate "$KB" "$TSV" "$WORK/poj" 20000
+run $KBC simulate "$KB" "$TSV" "$WORK/ex" 5000
+# 같은 상태들을 설치된 VSCode 의 조건식 분석기와 평가기로 (node 가 없거나 VSCode 가 없으면 건너뜀)
+if command -v node >/dev/null 2>&1; then
+    $KBC states "$TSV" "$WORK/poj" 20000 > "$WORK/kb/states.json"
+    run node "$HERE/vscode_when.js" "$KB" "$TSV" "$WORK/kb/states.json" "$WORK/poj"
+else
+    echo "node not found: skipped the check with VSCode's own when-clause parser"
+fi
+cd "$WORK/poj"
+run vsc --remove
+run $KBC ours "$KB" "$TSV" "$WORK/ex"
+cd "$WORK/ex"
+run vsc --remove
+run same_as "$KB" "$ORIG"
+echo "--- no keybindings.json yet"
+rm -f "$KB"
+cd "$WORK/poj"
+run vsc
+run $KBC parse "$KB"
+run $KBC ours "$KB" "$TSV" "$WORK/poj"
+run vsc --remove
+run $KBC parse "$KB"
+echo "--- empty array [] without a final newline"
+printf '[]' > "$KB"; cp "$KB" "$ORIG"
+run vsc
+run $KBC parse "$KB"
+run vsc --remove
+run same_as "$KB" "$ORIG"
+echo "--- an entry on the same line as ["
+printf '[{ "key": "f1", "command": "x" }]\n' > "$KB"; cp "$KB" "$ORIG"
+run vsc
+run $KBC same-user "$KB" "$ORIG"
+run $KBC ours "$KB" "$TSV" "$WORK/poj"
+run vsc --remove
+run same_as "$KB" "$ORIG"
+echo "--- not a JSON array: left alone"
+printf '{ "oops": 1 }\n' > "$KB"; cp "$KB" "$ORIG"
+run vsc
+run same_as "$KB" "$ORIG"
+echo "--- a begin line without an end line: left alone"
+printf '[\n    // >>> vsc shift+escape (plzrun-vscode-gcc-setup)\n]\n' > "$KB"; cp "$KB" "$ORIG"
+run vsc
+run same_as "$KB" "$ORIG"
+echo "--- uninstall.sh takes the whole part out (fake HOME)"
+cp "$HERE/fixtures/keybindings-user.jsonc" "$KB"; cp "$KB" "$ORIG"
+run vsc
+cd "$WORK/ex"; run vsc
+mkdir -p "$WORK/home"
+run env HOME="$WORK/home" bash "$REPO/uninstall.sh"
+run same_as "$KB" "$ORIG"
+cd "$WORK/poj"; run vsc --remove; cd "$WORK/ex"; run vsc --remove
+cp "$HERE/fixtures/keybindings-user.jsonc" "$KB"
 
 echo; echo "################ help"
 run vsc --help
