@@ -1,0 +1,15 @@
+// Place your key bindings in this file to override the defaults
+/* a block comment with a [ bracket and a // slash pair */
+[
+    {
+        "key": "cmd+left",
+        "command": "workbench.action.navigateBack",
+        "when": "canNavigateBack" // trailing comment with [ ]
+    },
+    { "key": "ctrl+k ctrl+[", "command": "type", "args": { "text": "[ // not a comment" } },
+    /* user note: keep this */
+    {
+        "key": "alt+left",
+        "command": "workbench.action.navigateBack"
+    }
+]
