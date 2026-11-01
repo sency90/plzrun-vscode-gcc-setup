@@ -10,7 +10,7 @@ vsc 는 이 목록마다 Shift+Esc 단축키를 하나씩 만들어 사용자 ke
 사용법 (개발할 때만, vsc 자체는 python 이 필요 없다):
   python3 tools/gen-shift-esc.py <기본 단축키 덤프.json> <VSCode 앱 extensions 폴더> <~/.vscode/extensions> > templates/shift-esc.tsv
 기본 단축키 덤프는 VSCode 의 "Preferences: Open Default Keyboard Shortcuts (JSON)" 와 같은 파일이다.
-판별 덤프: https://github.com/codebling/vs-code-default-keybindings (macos.keybindings.json)
+VSCode 판마다 저장한 덤프: https://github.com/codebling/vs-code-default-keybindings (macos.keybindings.json)
 """
 import glob, json, os, re, sys
 

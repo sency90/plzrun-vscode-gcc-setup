@@ -93,6 +93,20 @@ uninstall.sh    ← 명령/복사본 제거
 
 ---
 
+### Shift+Esc = Esc (`lib/keybindings.sh`, `templates/shift-esc.tsv`)
+- 요청: Shift+Esc 를 자주 누르니 Esc 로 처리하고, vsc 를 설치한 프로젝트 안에서만 그렇게 해 달라.
+- 프로젝트 단위 단축키는 VSCode 에 없다. 1.143.1 본체 소스를 보면 단축키 서비스는 현재 프로필의 `keybindingsResource`(사용자 `keybindings.json`)만 읽는다.
+  - 그래서 사용자 `keybindings.json` 에 넣고, 조건(`when`)에 `resourcePath =~ /^(폴더)\//` 를 더해 그 폴더 파일에서만 켠다.
+- Esc 의 일은 명령 하나가 아니다. Esc 에 묶인 기본 단축키가 81개(VSCode 1.143.1)이고, 그중 같은 일을 하는 Shift+Esc 단축키가 이미 있는 것은 18개뿐이다.
+  - 이미 Shift+Esc 에 묶인 18개는 모두 Esc 와 같은 명령, 같은 조건이다. 다른 일을 하는 Shift+Esc 기본 단축키는 없다(충돌 없음).
+  - 그래서 Esc 단축키 전부를 같은 차례로 복사한다. 사용자 파일의 규칙은 기본보다 우선하고, 한 파일 안에서는 뒤가 이긴다.
+  - 그러므로 폴더 안에서는 Esc 에서 이기는 규칙의 복사본이 Shift+Esc 에서도 이긴다.
+- VSCodeVim 의 Esc 는 `extension.vim_escape` 명령이고, 이 명령은 Vim 에 `<Esc>` 키를 그대로 넘긴다(확장 소스 확인). 그래서 Vim 입력 모드 빠져나가기도 같다.
+  - Vim 설정(`vim.insertModeKeyBindings` 의 `<S-Esc>`)으로는 안 된다. VSCodeVim 은 자기 package.json 에 적힌 키만 받는데, Shift+Esc 는 거기 없다.
+- 목록은 기본 단축키 JSON 덤프(VSCode 의 "Open Default Keyboard Shortcuts (JSON)" 과 같은 파일을 VSCode 판마다 저장한 공개 저장소)와 확장 package.json 에서 `tools/gen-shift-esc.py` 가 만든다. VSCode 판이 바뀌면 다시 만든다.
+- 파일 고치기는 bash 와 awk 만 쓴다. 주석과 문자열을 건너뛰며 배열의 `[` 를 찾고 그 뒤에 칸을 넣는다.
+  - 칸 밖 글자는 그대로다. `[` 줄 뒤에 글이 이어지면 줄을 나누고 표시(`[split]`)를 남겨, 뺄 때 다시 붙인다. 끝 줄바꿈이 없던 파일은 없는 채로 둔다.
+
 ## 4. 사용 흐름
 ```bash
 # 최초 1회 (PC당)

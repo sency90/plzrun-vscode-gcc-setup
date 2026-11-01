@@ -180,12 +180,27 @@ single 방식:
 - 필요 확장: `ms-vscode.cpptools` (install.sh 가 설치).
 - Linux/WSL 에서 F5 를 쓰려면 `gdb` 가 있어야 한다(빌드와 실행에는 필요 없다).
 
+## Shift+Esc = Esc
+
+- `vsc` 로 세팅한 폴더 안의 파일에서는 VSCode 의 Shift+Esc 가 Esc 와 똑같이 동작한다.
+  - Vim(VSCodeVim) 입력 모드 빠져나가기, 자동 완성 닫기, 찾기 창 닫기, 여러 커서 해제, 매개변수 힌트 닫기, 빠른 열기와 알림 닫기 등 Esc 의 일 전부다.
+- VSCode 는 단축키를 프로젝트(`.vscode/`) 단위로 두지 못한다. 단축키는 사용자 `keybindings.json` 하나에서만 읽는다.
+  - 그래서 `vsc` 가 사용자 `keybindings.json` 에 표시 주석(`// >>> vsc shift+escape` ~ `// <<< vsc shift+escape`)으로 묶은 칸을 넣는다.
+  - 칸 안 단축키마다 "Esc 의 원래 조건 && 파일이 그 폴더 안"(`resourcePath =~ /^(폴더)\//`) 조건이 붙는다. 다른 폴더에서는 Shift+Esc 가 예전 그대로다.
+- 사용자가 넣은 항목은 한 글자도 바꾸지 않는다. 칸은 배열 맨 앞에 들어간다.
+- 같은 폴더에서 다시 쳐도 칸은 하나다. 폴더가 여럿이면 칸 안 `// vsc-folder:` 줄에 모은다.
+- `vsc --remove` 는 그 폴더를 칸에서 뺀다. 마지막 폴더가 빠지면 칸이 통째로 빠지고 파일은 원래 바이트로 돌아간다. `uninstall.sh` 는 칸 전체를 뺀다.
+- 파일이 JSON 배열(`[`)로 시작하지 않거나 표시가 깨져 있으면 손대지 않고 경고만 낸다.
+- 자리: macOS `~/Library/Application Support/Code/User/keybindings.json`, Linux `~/.config/Code/User/keybindings.json`. WSL 에서는 VSCode 단축키가 Windows 쪽에 있어서 넣지 않고 알린다.
+- Esc 단축키 목록은 `templates/shift-esc.tsv` 다. VSCode 1.143.1 기본 81개, 내장 copilot 1개, VSCodeVim 2개이고, `tools/gen-shift-esc.py` 로 다시 만든다.
+- 칸이 효과를 내는 때는 지금 보고 있는 편집기 파일이 그 폴더 안일 때다. 편집기가 하나도 열려 있지 않으면 Shift+Esc 는 VSCode 기본 동작을 따른다.
+
 ## 설정 파일과 지우기
 
 - 설정은 `.vscode/vsc.conf` 하나에 있다. `tasks.json`, `launch.json` 은 명령을 칠 때마다 이 설정으로 다시 만든다. 손으로 고치지 않는다.
 - `vsc` 가 만들지 않은 `tasks.json`, `launch.json` 이 이미 있으면 덮지 않고 멈춘다. 바꾸려면 `--force`. 백업 사본(`.bak`)은 만들지 않는다.
 - 옛 버전이 만든 파일은 이 도구 것으로 알아보고 새 형식으로 바꾼다.
-- `vsc --remove` 는 `vsc` 가 만든 파일(`vsc.conf`, `tasks.json`, `launch.json`, `vsc-f5-stdin`)만 지운다. 빌드한 실행 파일은 지우지 않는다.
+- `vsc --remove` 는 `vsc` 가 만든 파일(`vsc.conf`, `tasks.json`, `launch.json`, `vsc-f5-stdin`)만 지운다. 빌드한 실행 파일은 지우지 않는다. Shift+Esc 칸에서도 그 폴더를 뺀다.
 
 ## 시험
 
@@ -194,6 +209,10 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
 ```
 
 - 두 폴더를 `test/work/` 로 복사해(원본은 읽기만) 모든 명령을 돌리고 출력을 남긴다.
+- Shift+Esc 칸은 시험용 `keybindings.json`(`VSC_KEYBINDINGS`)에만 쓴다. 실제 사용자 파일은 건드리지 않는다.
+  - `test/kb_check.py`: 엄격한 JSON 읽기(주석 빼고 끝 쉼표 없음), 사용자 항목 그대로, Esc 규칙마다 vsc 항목 하나.
+  - 같은 파일로 무작위 상태 2만 개와 Esc 규칙마다 그 규칙이 이기는 상태 하나씩을 만든다. 폴더 안에서는 Shift+Esc 가 Esc 와 같은 명령을 고르고, 폴더 밖에서는 vsc 규칙이 하나도 걸리지 않아야 한다.
+  - `test/vscode_when.js`: 같은 검사를 설치된 VSCode 본체의 조건식 분석기와 평가기로 한다(본체 번들에서 그 부분을 떼어 node 로 돌림).
 - `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS). Ctrl+F5 는 cpptools 1.34.4 가 만드는 것과 같은 터미널 명령 줄을 셸로 돌린다.
 
 ## 구성
@@ -202,13 +221,21 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
 plzrun-vscode-gcc-setup/
 ├── install.sh / uninstall.sh
 ├── setup.sh                 # 생성기 (vsc 명령의 본체)
+├── lib/
+│   └── keybindings.sh       # Shift+Esc 칸 넣기와 빼기 (setup.sh, uninstall.sh 공용)
 ├── templates/
 │   ├── tasks.ex.json        # ex 방식 태스크
 │   ├── tasks.single.json    # single 방식 태스크
-│   └── launch.json          # F5 (두 방식 공용)
+│   ├── launch.json          # F5 (두 방식 공용)
+│   └── shift-esc.tsv        # Esc 에 묶인 VSCode 단축키 전부 (명령, 조건)
+├── tools/
+│   └── gen-shift-esc.py     # shift-esc.tsv 만들기 (개발할 때만)
 ├── test/
 │   ├── check.sh
-│   └── vscode_sim.py
+│   ├── vscode_sim.py
+│   ├── kb_check.py          # Shift+Esc 칸 검사
+│   ├── vscode_when.js       # 설치된 VSCode 의 조건식 분석기로 검사
+│   └── fixtures/keybindings-user.jsonc
 ├── HOW_IT_WORKS.md
 ├── LICENSE                  # MIT
 └── README.md
