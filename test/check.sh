@@ -27,7 +27,8 @@ cp -p "$EX_SRC"/*.cpp "$WORK/ex/"
 cp -p "$POJ_SRC"/*.cpp "$POJ_SRC"/in* "$WORK/poj/$PROB/"
 
 SIM="python3 -I $HERE/vscode_sim.py"
-run() { echo; echo "\$ $*"; "$@"; echo "[exit $?]"; }
+# 입력이 없는 경우(터미널에서 읽기)가 시험을 멈추지 않게 표준 입력은 /dev/null
+run() { echo; echo "\$ $*"; "$@" < /dev/null; echo "[exit $?]"; }
 
 echo "################ poj copy: $WORK/poj"
 cd "$WORK/poj"
