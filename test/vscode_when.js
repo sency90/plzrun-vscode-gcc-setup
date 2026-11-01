@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 // Check keybindings with the when-clause parser and evaluator of the installed VSCode (tests only).
 //
-//   node vscode_when.js <kb.json> <shift-esc.tsv> <states.json> <folder>
+//   node vscode_when.js <kb.json> <shift-esc.tsv> <states.json>
 //
 // The parser is cut out of VSCode's own workbench bundle at run time (by the shape of the code,
 // not by the minified names, which change between versions) and run in a sandbox where every
 // outside name is an empty stand-in. Then:
 //   1. every "when" in kb.json must parse with no error (VSCode would ignore a rule that does not)
-//   2. for each state in states.json, using VSCode's evaluate():
-//      inside <folder>: Shift+Esc must run the same command as Esc (a later matching rule wins)
-//      outside it: no vsc rule may match
+//   2. for each state in states.json (any file, or no editor), using VSCode's evaluate():
+//      Shift+Esc must run the same command as Esc (a later matching rule wins)
 // Exit 3 = VSCode not found (the caller skips the check).
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
@@ -66,7 +65,7 @@ function stripComments(t) {
 }
 
 function main() {
-  const [kbFile, tsvFile, statesFile, folder] = process.argv.slice(2);
+  const [kbFile, tsvFile, statesFile] = process.argv.slice(2);
   const vs = loadParser();
   if (!vs) { console.log("VSCode not found: skipped"); process.exit(3); }
   const P = new vs.Parser({ regexParsingWithErrorRecovery: false });
@@ -78,11 +77,12 @@ function main() {
     }
     return e;
   };
-  const kb = JSON.parse(stripComments(fs.readFileSync(kbFile, "utf8")) || "[]");
-  const isOurs = (k) => k.key === "shift+escape" && (k.when || "").includes("resourcePath =~ /^(");
-  let n = 0;
-  const user = kb.map((k) => ({ ...k, expr: parse(k.when, k.command), ours: isOurs(k) }));
-  n = user.length;
+  const text = fs.readFileSync(kbFile, "utf8");
+  const kb = JSON.parse(stripComments(text) || "[]");
+  const b = text.indexOf("// >>> vsc shift+escape"), e = text.indexOf("// <<< vsc shift+escape");
+  const ours = b < 0 ? 0 : (text.slice(b, e).match(/"key": "shift\+escape"/g) || []).length;
+  const user = kb.map((k) => ({ ...k, expr: parse(k.when, k.command) }));
+  const n = user.length;
   const esc = [];
   for (const ln of fs.readFileSync(tsvFile, "utf8").split("\n")) {
     if (!ln || ln.startsWith("#")) continue;
@@ -93,24 +93,18 @@ function main() {
   const sesc = user.filter((k) => k.key === "shift+escape");
   const win = (rules, ctx) => { let w = null; for (const r of rules) if (r.expr.evaluate(ctx)) w = r.command; return w; };
   const states = JSON.parse(fs.readFileSync(statesFile, "utf8"));
-  let inside = 0, outside = 0, ran = 0;
+  let ran = 0, noed = 0;
   const cmds = new Set();
   for (const st of states) {
     const ctx = { getValue: (k) => st[k] };
-    const e = win(esc, ctx), s = win(sesc, ctx);
-    if (typeof st.resourcePath === "string" && st.resourcePath.startsWith(folder + "/")) {
-      inside++;
-      if (e !== null) { ran++; cmds.add(e); }
-      if (e !== s) { console.log("inside: Esc -> " + e + " but Shift+Esc -> " + s + " in " + JSON.stringify(st)); process.exit(1); }
-    } else {
-      outside++;
-      const m = sesc.find((k) => k.ours && k.expr.evaluate(ctx));
-      if (m) { console.log("outside the folder a vsc rule matched: " + m.command); process.exit(1); }
-    }
+    const a = win(esc, ctx), s = win(sesc, ctx);
+    if (st.resourcePath === undefined) noed++;
+    if (a !== null) { ran++; cmds.add(a); }
+    if (a !== s) { console.log("Esc -> " + a + " but Shift+Esc -> " + s + " in " + JSON.stringify(st)); process.exit(1); }
   }
-  console.log("VSCode " + vs.version + " parser: all " + n + " when clauses in keybindings.json and " +
-    (esc.length) + " Esc rules parse");
-  console.log("VSCode evaluator: " + inside + " states inside (Esc ran a command in " + ran + ", " + cmds.size +
-    " different commands), " + outside + " outside: Shift+Esc = Esc inside, no vsc rule outside");
+  console.log("VSCode " + vs.version + " parser: all " + n + " when clauses in keybindings.json (" + ours +
+    " in the vsc part) and " + esc.length + " Esc rules parse");
+  console.log("VSCode evaluator: " + states.length + " states (" + noed + " with no editor open; Esc ran a command in " +
+    ran + ", " + cmds.size + " different commands): Shift+Esc = Esc every time");
 }
 main();

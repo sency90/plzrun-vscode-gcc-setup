@@ -20,7 +20,8 @@ LANGS="c++11 c++14 c++17 c++20 c++23"
 DEF_LANG="c++14"
 DEF_STDIN="in"
 DEF_STDOUT=""          # 빈 값 = 터미널
-VALUE_OPTS="lang stdin stdout"
+VALUE_OPTS="lang stdin stdout shift-esc"
+SE_VALUES="on off"
 FLAG_OPTS="init remove ex single force help"
 
 say()  { printf '%s: %s\n' "$PROG" "$*"; }
@@ -39,7 +40,7 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 TPL="$SCRIPT_DIR/templates"
 [ -d "$TPL" ] || { err "templates folder not found: $TPL"; exit 1; }
-# Shift+Esc = Esc: 사용자 keybindings.json 의 vsc 칸 (lib/keybindings.sh)
+# Shift+Esc = Esc: 사용자 keybindings.json 의 vsc 칸 (lib/keybindings.sh). PC 전체 설정이라 -shift-esc 만 바꾼다
 KB_LIB="$SCRIPT_DIR/lib/keybindings.sh"
 KB_TSV="$TPL/shift-esc.tsv"
 [ -f "$KB_LIB" ] && . "$KB_LIB"
@@ -131,6 +132,8 @@ value_example() {
                 hint "values:  $LANGS (default $DEF_LANG)" ;;
         stdin)  hint "example: $PROG -stdin in2      ($PROG -stdin default goes back to '$DEF_STDIN')" ;;
         stdout) hint "example: $PROG -stdout out2    ($PROG -stdout default goes back to the terminal)" ;;
+        shift-esc) hint "example: $PROG -shift-esc on    ($PROG -shift-esc off turns it off)"
+                   hint "values:  on off (Shift+Esc works like Esc in all of VSCode, or not)" ;;
     esac
 }
 
@@ -153,11 +156,14 @@ Options with a value (one dash):
   -stdin <file>    input file, in the folder of the file you are viewing
                    (default '$DEF_STDIN')
   -stdout <file>   output file, in the same folder (default: the terminal)
-  Give 'default' as the value to go back to the default.
+  -shift-esc <on|off>
+                   Shift+Esc works like Esc in all of VSCode, or not
+                   (for the whole PC, not this folder; see below)
+  Give 'default' as the value of -lang, -stdin or -stdout to go back to the default.
 
 Options without a value (two dashes):
   --init     reset every setting to the default (for a new problem)
-  --remove   delete the files vsc made in .vscode/ (and its Shift+Esc keybindings)
+  --remove   delete the files vsc made in .vscode/
   --ex       use ex mode
   --single   use single-file mode
   --force    replace tasks.json / launch.json even if vsc did not make them
@@ -172,10 +178,14 @@ Examples:
 
 Without [folder], vsc uses the nearest folder above that is already set up
 (so 'vsc -stdin in2' inside poj/14216 changes the poj setup).
-Shift+Esc works like Esc in VSCode for files in a folder set up by vsc
-(Vim insert mode, suggestions, find, multiple cursors, and every other Esc).
-VSCode reads keybindings only from your user keybindings.json, so vsc adds
-a marked part there, limited to these folders; your own entries are kept.
+Shift+Esc = Esc is one setting for the whole PC, not for a folder:
+  $PROG -shift-esc on    Shift+Esc works like Esc everywhere in VSCode
+                      (Vim insert mode, suggestions, find, multiple cursors,
+                      and every other Esc)
+  $PROG -shift-esc off   Shift+Esc goes back to VSCode's default
+install.sh turns it on and uninstall.sh turns it off. '$PROG', '--init' and
+'--remove' never change it. VSCode reads keybindings only from your user
+keybindings.json, so vsc adds a marked part there; your own entries are kept.
 EOF
 }
 
@@ -211,8 +221,8 @@ missing_value() {
     exit 1
 }
 
-OPT_LANG=""; OPT_STDIN=""; OPT_STDOUT=""
-HAVE_LANG=0; HAVE_STDIN=0; HAVE_STDOUT=0
+OPT_LANG=""; OPT_STDIN=""; OPT_STDOUT=""; OPT_SE=""
+HAVE_LANG=0; HAVE_STDIN=0; HAVE_STDOUT=0; HAVE_SE=0
 F_INIT=0; F_REMOVE=0; F_EX=0; F_SINGLE=0; F_FORCE=0; F_HELP=0
 POS_DIR=""; HAVE_DIR=0
 ANY_OPT=0
@@ -222,6 +232,7 @@ set_value() {  # set_value NAME VALUE
         lang)   OPT_LANG="$2";   HAVE_LANG=1 ;;
         stdin)  OPT_STDIN="$2";  HAVE_STDIN=1 ;;
         stdout) OPT_STDOUT="$2"; HAVE_STDOUT=1 ;;
+        shift-esc) OPT_SE="$2"; HAVE_SE=1; return 0 ;;   # 폴더 설정과 따로 (ANY_OPT 아님)
     esac
     ANY_OPT=1
 }
@@ -236,11 +247,11 @@ while [ $# -gt 0 ]; do
             a="$b" ;;
     esac
     case "$a" in
-        -lang|-stdin|-stdout)
+        -lang|-stdin|-stdout|-shift-esc)
             name="${a#-}"
             if [ $# -eq 0 ] || is_optionlike "$1"; then missing_value "$name"; fi
             set_value "$name" "$1"; shift ;;
-        -lang=*|-stdin=*|-stdout=*)
+        -lang=*|-stdin=*|-stdout=*|-shift-esc=*)
             name="${a#-}"; name="${name%%=*}"
             [ -n "${a#*=}" ] || missing_value "$name"
             set_value "$name" "${a#*=}" ;;
@@ -250,7 +261,7 @@ while [ $# -gt 0 ]; do
         --single) F_SINGLE=1; ANY_OPT=1 ;;
         --force)  F_FORCE=1;  ANY_OPT=1 ;;
         --help|-h) F_HELP=1 ;;
-        --lang|--stdin|--stdout|--lang=*|--stdin=*|--stdout=*)
+        --lang|--stdin|--stdout|--shift-esc|--lang=*|--stdin=*|--stdout=*|--shift-esc=*)
             name="${a#--}"; name="${name%%=*}"
             err "unknown option '$a'"
             hint "options with a value use one dash: -$name"
@@ -311,6 +322,15 @@ if [ "$HAVE_STDOUT" -eq 1 ]; then
             exit 1 ;;
     esac
 fi
+if [ "$HAVE_SE" -eq 1 ]; then
+    OPT_SE=$(printf '%s' "$OPT_SE" | tr 'A-Z' 'a-z')
+    if ! in_list "$OPT_SE" "$SE_VALUES"; then
+        err "unknown value for -shift-esc: '$OPT_SE'"
+        value_example shift-esc
+        print_suggestions "$(closest "$OPT_SE" "$SE_VALUES")" || true
+        exit 1
+    fi
+fi
 if [ "$F_EX" -eq 1 ] && [ "$F_SINGLE" -eq 1 ]; then
     err "--ex and --single cannot be used together"
     exit 1
@@ -321,6 +341,67 @@ if [ "$F_REMOVE" -eq 1 ]; then
         hint "run '$PROG --remove' first, then '$PROG' with the new options"
         exit 1
     fi
+fi
+
+# ----------------------------------------------------------------------------
+#  -shift-esc on|off : 사용자 keybindings.json 의 vsc 칸 (PC 전체, 폴더와 상관없음)
+# ----------------------------------------------------------------------------
+# se_was : state 결과를 사람이 읽는 말로 (on everywhere / on in 2 folders only / off)
+se_was() {
+    case "$1" in
+        on) printf 'on' ;;
+        folders) printf 'on in %s folder%s only' "$2" "$([ "$2" -eq 1 ] || printf s)" ;;
+        *) printf 'off' ;;
+    esac
+}
+shift_esc() {
+    local kb was nfold n
+    if ! command -v kb_update >/dev/null 2>&1 || [ ! -f "$KB_TSV" ]; then
+        err "Shift+Esc cannot be changed: lib/keybindings.sh or templates/shift-esc.tsv is missing"
+        hint "run install.sh again"
+        exit 1
+    fi
+    kb="$(kb_path)"
+    if [ -z "$kb" ]; then
+        err "Shift+Esc cannot be changed here (${KB_WHY})"
+        hint "add the Shift+Esc keybindings in that VSCode yourself if you need them (the list: $KB_TSV)"
+        exit 1
+    fi
+    kb_update "$kb" "$KB_TSV" state
+    if [ "$KB_STATUS" = refused ]; then
+        err "could not read $kb: $KB_WHY"; hint "the file was not changed"; exit 1
+    fi
+    nfold=0; [ -n "$KB_FOLDERS" ] && nfold=$(printf '%s\n' "$KB_FOLDERS" | wc -l | tr -d ' ')
+    was="$(se_was "$KB_STATUS" "$nfold")"
+    kb_update "$kb" "$KB_TSV" "$OPT_SE"
+    n=$(grep -c "	" "$KB_TSV")
+    case "$KB_STATUS" in
+        refused)
+            err "could not change $kb: $KB_WHY"
+            hint "the file was not changed"
+            exit 1 ;;
+        unchanged) say "nothing changed in $kb (shift-esc is already on)" ;;
+        absent)    say "nothing changed in $kb (shift-esc is already off)" ;;
+        added|updated)
+            say "updated $kb"
+            if [ "$was" = on ]; then line "shift-esc: on  (the vsc part was out of date)"
+            else line "shift-esc: $was -> on everywhere  (Shift+Esc works like Esc in all of VSCode)"; fi
+            if [ "$KB_STATUS" = added ]; then line "added the vsc part with $n keybindings; your own keybindings are kept"
+            else line "rewrote the vsc part with $n keybindings; your own keybindings are kept"; fi
+            if [ -n "$KB_FOLDERS" ]; then
+                line "no longer limited to:"
+                printf '%s\n' "$KB_FOLDERS" | while IFS= read -r f; do line "  $f"; done
+            fi ;;
+        cleared)
+            say "updated $kb"
+            line "shift-esc: $was -> off  (Shift+Esc is back to VSCode's default)"
+            line "removed the vsc part; your own keybindings are kept" ;;
+    esac
+}
+if [ "$HAVE_SE" -eq 1 ]; then
+    shift_esc
+    # 단독으로 쓰면 폴더는 건드리지 않는다
+    [ "$ANY_OPT" -eq 0 ] && [ "$HAVE_DIR" -eq 0 ] && exit 0
 fi
 
 # ----------------------------------------------------------------------------
@@ -352,29 +433,6 @@ CONF="$VSC/$CONF_NAME"
 
 is_ours() { grep -q "$MARK" "$1" 2>/dev/null; }
 
-# shift_esc MODE : 이 폴더(TARGET)를 Shift+Esc 칸에 넣거나(add) 뺀다(remove). 바뀐 것만 SE_NOTE 에
-SE_NOTE=""; SE_WARN=""
-shift_esc() {
-    local kb
-    SE_NOTE=""; SE_WARN=""
-    if ! command -v kb_update >/dev/null 2>&1 || [ ! -f "$KB_TSV" ]; then
-        [ "$1" = add ] && SE_WARN="Shift+Esc was not set up: lib/keybindings.sh or templates/shift-esc.tsv is missing (run install.sh again)"
-        return 0
-    fi
-    kb="$(kb_path)"
-    if [ -z "$kb" ]; then
-        [ "$1" = add ] && SE_WARN="Shift+Esc was not set up (${KB_WHY}); add the keybindings yourself if you need them"
-        return 0
-    fi
-    kb_update "$kb" "$KB_TSV" "$1" "$TARGET"
-    case "$KB_STATUS" in
-        added)   SE_NOTE="keybindings: Shift+Esc now works like Esc in this folder (added to $kb)" ;;
-        removed) SE_NOTE="keybindings: Shift+Esc is back to normal in this folder (removed from $kb)" ;;
-        refused) SE_WARN="Shift+Esc was not set up: $KB_WHY ($kb was not changed)" ;;
-    esac
-    return 0
-}
-
 # ----------------------------------------------------------------------------
 #  --remove
 # ----------------------------------------------------------------------------
@@ -397,9 +455,6 @@ if [ "$F_REMOVE" -eq 1 ]; then
     fi
     for f in $kept; do line "kept $f (not made by vsc)"; done
     if [ -d "$VSC" ] && rmdir "$VSC" 2>/dev/null; then line "removed the empty .vscode/ folder"; fi
-    shift_esc remove
-    [ -n "$SE_NOTE" ] && line "$SE_NOTE"
-    [ -n "$SE_WARN" ] && warn "$SE_WARN"
     [ -n "$removed" ] && line "run '$PROG' to set it up again"
     exit 0
 fi
@@ -564,15 +619,12 @@ mkdir -p "$VSC"
 write_file "$CONF_NAME" "$NEW_CONF"
 write_file tasks.json "$NEW_TASKS"
 write_file launch.json "$NEW_LAUNCH"
-shift_esc add
 
 print_file_notes() {
     [ -n "$W_CREATED" ] && line ".vscode: created ${W_CREATED#, }"
     [ -n "$W_REWROTE" ] && line ".vscode: rewrote ${W_REWROTE#, }"
     [ -n "$W_OLDER" ]   && line ".vscode: updated ${W_OLDER#, } (made by an older version of this tool)"
     [ -n "$W_FOREIGN" ] && line ".vscode: replaced ${W_FOREIGN#, } (not made by vsc; --force)"
-    [ -n "$SE_NOTE" ] && line "$SE_NOTE"
-    [ -n "$SE_WARN" ] && warn "$SE_WARN"
     return 0
 }
 

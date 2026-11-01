@@ -65,14 +65,16 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
 ```
 setup.sh        ← 실제 생성기. 현재 폴더(또는 인자 폴더)에 .vscode/ 생성
 templates/      ← 부어 넣을 tasks.json / launch.json 원본
-install.sh      ← 전역 명령 'plzrun-vscode-gcc-setup' 설치 + cpptools 확장
-uninstall.sh    ← 명령/복사본 제거
+lib/            ← keybindings.sh: Shift+Esc 칸 넣기와 빼기
+install.sh      ← 전역 명령 vsc, 'plzrun-vscode-gcc-setup' 설치 + cpptools 확장 + Shift+Esc 켜기
+uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기
 ```
 
 ### `setup.sh` 가 하는 일
 1. **자기 위치를 심링크까지 따라가 해석**해서 `templates/`를 찾는다(설치 후 `~/.local/bin`의 명령이 심링크/래퍼여도 원본 templates를 찾도록).
 2. 인자를 읽는다. 값 있는 옵션은 대시 하나, 값 없는 옵션은 대시 둘. 모르는 옵션이나 값은 거리(글자 바꾸기, 넣기, 빼기, 이웃 두 글자 뒤바꾸기)가 가장 가까운 것을 `Did you mean` 으로 알려 주고 아무것도 바꾸지 않는다. 거리 계산은 `awk` 로 한다.
 3. 대상 폴더를 정한다. 폴더를 안 주면 현재 폴더. 다만 현재 폴더에 `main.cpp` 도 `.vscode/` 도 없으면(poj/14216 같은 문제 폴더) 위로 올라가 `vsc.conf` 가 있는 폴더를 쓴다(git 이 `.git` 을 찾는 것과 같다).
+   - `-shift-esc on|off` 는 이 단계 전에 따로 처리한다. PC 전체 설정이라 폴더와 상관없고, 혼자 쓰면 여기서 끝난다.
 4. `vsc.conf` 를 읽고(없으면 첫 세팅), `--init`, `--ex`, `--single`, `-lang`, `-stdin`, `-stdout` 순으로 새 값을 정한다.
 5. `templates/` 의 `@STD@` 같은 자리를 채워 `tasks.json`, `launch.json` 을 만든다. 내용이 같으면 파일을 건드리지 않는다.
 6. 이 도구가 만들지 않은 `tasks.json`, `launch.json` 이 있으면 `--force` 없이 덮지 않는다. 옛 버전처럼 `.bak` 를 만들지 않는다(사본이 쌓여 헷갈렸다).
@@ -85,22 +87,28 @@ uninstall.sh    ← 명령/복사본 제거
 2. 생성기(setup.sh + templates)를 `~/.local/share/plzrun-vscode-gcc-setup/`에 복사.
 3. `~/.local/bin/vsc` 와 `~/.local/bin/plzrun-vscode-gcc-setup` 래퍼 생성 → 둘 다 위 setup.sh를 현재 폴더에서 실행. 같은 이름의 다른 프로그램이 이미 있으면 덮지 않고 알린다.
 4. `ms-vscode.cpptools` 확장 설치(`code --install-extension`).
-5. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
+5. Shift+Esc = Esc 를 켠다(사용자 `keybindings.json` 에 vsc 칸). 다시 돌려도 칸은 하나, v1.3.0 의 폴더 한정 칸은 PC 전체 칸으로 바꾼다.
+6. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
 
 ### `uninstall.sh`
 - `~/.local/bin`의 명령 두 개(이 도구 래퍼만) + `~/.local/share/...` 복사본 제거.
+- 사용자 `keybindings.json` 의 Shift+Esc 칸을 뺀다(사용자 항목은 그대로).
 - **cpptools는 범용 확장이라 제거하지 않음**(다른 C++ 작업에 쓰일 수 있으니). 이미 생성된 각 프로젝트의 `.vscode/`도 사용자 자산이라 그대로 둠.
 
 ---
 
 ### Shift+Esc = Esc (`lib/keybindings.sh`, `templates/shift-esc.tsv`)
-- 요청: Shift+Esc 를 자주 누르니 Esc 로 처리하고, vsc 를 설치한 프로젝트 안에서만 그렇게 해 달라.
+- 요청: Shift+Esc 를 자주 누르니 Esc 로 처리해 달라.
 - 프로젝트 단위 단축키는 VSCode 에 없다. 1.143.1 본체 소스를 보면 단축키 서비스는 현재 프로필의 `keybindingsResource`(사용자 `keybindings.json`)만 읽는다.
-  - 그래서 사용자 `keybindings.json` 에 넣고, 조건(`when`)에 `resourcePath =~ /^(폴더)\//` 를 더해 그 폴더 파일에서만 켠다.
+  - 그래서 사용자 `keybindings.json` 에 넣는다. 이 파일은 PC 에 하나다.
+- 처음(v1.3.0)에는 조건(`when`)에 `resourcePath =~ /^(폴더)\//` 를 더해 `vsc` 로 세팅한 폴더에서만 켰다. v1.4.0 에서 PC 전체 설정으로 바꿨다.
+  - 이유: 프로젝트 10개에 세팅하고 하나를 지우면 나머지 9개에서는 계속 Shift+Esc = Esc 여야 한다. 폴더 목록을 맞추는 일이 프로젝트 명령에 묶이면 이런 때 헷갈린다.
+  - 그래서 칸은 `install.sh` 가 켜고 `uninstall.sh` 가 끈다. 중간에 바꾸려면 `vsc -shift-esc on|off`. 프로젝트 명령(`vsc`, `--init`, `--remove`)은 칸을 건드리지 않는다.
+  - 값이 붙는 옵션이라 대시 하나다(`-lang` 과 같은 규칙). `--shift-esc` 는 `--lang` 처럼 "대시 하나" 안내로 거절한다.
 - Esc 의 일은 명령 하나가 아니다. Esc 에 묶인 기본 단축키가 81개(VSCode 1.143.1)이고, 그중 같은 일을 하는 Shift+Esc 단축키가 이미 있는 것은 18개뿐이다.
   - 이미 Shift+Esc 에 묶인 18개는 모두 Esc 와 같은 명령, 같은 조건이다. 다른 일을 하는 Shift+Esc 기본 단축키는 없다(충돌 없음).
   - 그래서 Esc 단축키 전부를 같은 차례로 복사한다. 사용자 파일의 규칙은 기본보다 우선하고, 한 파일 안에서는 뒤가 이긴다.
-  - 그러므로 폴더 안에서는 Esc 에서 이기는 규칙의 복사본이 Shift+Esc 에서도 이긴다.
+  - 그러므로 어디서나 Esc 에서 이기는 규칙의 복사본이 Shift+Esc 에서도 이긴다.
 - VSCodeVim 의 Esc 는 `extension.vim_escape` 명령이고, 이 명령은 Vim 에 `<Esc>` 키를 그대로 넘긴다(확장 소스 확인). 그래서 Vim 입력 모드 빠져나가기도 같다.
   - Vim 설정(`vim.insertModeKeyBindings` 의 `<S-Esc>`)으로는 안 된다. VSCodeVim 은 자기 package.json 에 적힌 키만 받는데, Shift+Esc 는 거기 없다.
 - 목록은 기본 단축키 JSON 덤프(VSCode 의 "Open Default Keyboard Shortcuts (JSON)" 과 같은 파일을 VSCode 판마다 저장한 공개 저장소)와 확장 package.json 에서 `tools/gen-shift-esc.py` 가 만든다. VSCode 판이 바뀌면 다시 만든다.

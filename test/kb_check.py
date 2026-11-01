@@ -4,15 +4,17 @@
   kb_check.py parse <kb.json>
       parse it the strict way (comments taken out, no trailing comma allowed); print the entry count
   kb_check.py same-user <kb.json> <original.json>
-      the entries that are not vsc's must be exactly the original entries, in the same order
-  kb_check.py ours <kb.json> <shift-esc.tsv> <folder>...
-      vsc's entries: one shift+escape per tsv line, same command, when = (tsv when) && folder regex,
-      inside the marked part; the regex matches files in the folders and nothing else
-  kb_check.py states <shift-esc.tsv> <folder> <count>
+      the entries outside the vsc part must be exactly the original entries, in the same order
+  kb_check.py ours <kb.json> <shift-esc.tsv>
+      vsc's entries: one marked part at the start of the array, one shift+escape per tsv line,
+      same command and same when as the tsv (no folder condition, no // vsc-folder: line)
+  kb_check.py none <kb.json>
+      the file has no vsc part
+  kb_check.py states <shift-esc.tsv> <count>
       print the same states as simulate (random ones + one per Esc rule) as JSON, for vscode_when.js
-  kb_check.py simulate <kb.json> <shift-esc.tsv> <folder> <count>
-      random VSCode states: inside the folder, Shift+Esc must run the same command as Esc
-      (a later matching rule wins, user rules after the defaults); outside it, no vsc rule may match
+  kb_check.py simulate <kb.json> <shift-esc.tsv> <count>
+      random VSCode states (any file, or no editor at all): Shift+Esc must run the same command
+      as Esc every time (a later matching rule wins, user rules after the defaults)
 
 The when evaluator covers what the tsv uses: ! && || ( ) == != =~ /re/ 'str' and bare keys.
 """
@@ -50,16 +52,22 @@ def load(path):
     return t, v
 
 
-def ours_marked(text):
-    """entries written between the vsc markers (by their command+when text)"""
-    b, e = text.find(BEGIN), text.find(END)
-    if b < 0:
-        return 0
-    return text[b:e].count('"key": "shift+escape"')
-
-
-def is_ours(k):
-    return k.get("key") == "shift+escape" and "resourcePath =~ /^(" in k.get("when", "")
+def split_ours(path):
+    """(text, vsc entries, user entries): the user entries are what is left with the marked part taken out"""
+    text, v = load(path)
+    lines = text.split("\n")
+    b = next((i for i, x in enumerate(lines) if BEGIN in x), None)
+    if b is None:
+        return text, [], v
+    e = next(i for i in range(b, len(lines)) if END in lines[i])
+    rest = lines[:b] + lines[e + 1:]
+    if "[split]" in lines[b]:              # vsc split the [ line; join it back the same way
+        rest = lines[:b - 1] + [lines[b - 1] + lines[e + 1]] + lines[e + 2:]
+    u = json.loads(strip_comments("\n".join(rest)) or "[]")
+    k = len(v) - len(u)
+    if k < 0 or v[k:] != u:
+        raise SystemExit("the vsc part is not at the start of the array")
+    return text, v[:k], u
 
 
 def tsv_rows(path):
@@ -71,11 +79,6 @@ def tsv_rows(path):
         c, w = ln.split("\t", 1)
         rows.append((c, w))
     return rows
-
-
-def folder_regex(folders):
-    esc = lambda f: "".join("\\" + ch if ch in "\\^$.|?*+()[]{}/" else ch for ch in f)
-    return "resourcePath =~ /^(" + "|".join(esc(f) for f in folders) + ")\\//"
 
 
 # ---------------------------------------------------------------- when 평가
@@ -165,8 +168,12 @@ class When:
         raise ValueError(k)
 
 
-def make_states(esc, folder, count):
-    """random states (60% in the folder) + one state per rule that makes that rule's when true"""
+PATHS = ["/Users/me/github/poj/14216/14216.cpp", "/Users/me/sw expert/EX_1/user.cpp", "/elsewhere/a.cpp",
+         "/Users/me/notes/todo.md", "untitled:Untitled-1"]
+
+
+def make_states(esc, count):
+    """random states (any file, or no editor) + one state per rule that makes that rule's when true"""
     keys = {}
     for _, c in esc:
         for k, vals in c.keys().items(): keys.setdefault(k, set()).update(vals)
@@ -179,16 +186,12 @@ def make_states(esc, folder, count):
             elif rnd.random() < p: ctx[k] = True
     for i in range(count):
         ctx = {"true": True}; fill(ctx, keys, 0.35)
-        where = rnd.random()
-        if where < 0.6: ctx["resourcePath"] = folder + "/14216/14216.cpp"
-        elif where < 0.9:
-            ctx["resourcePath"] = rnd.choice(["/elsewhere/a.cpp", folder + "2/a.cpp", os.path.dirname(folder) + "/a.cpp",
-                                              folder, "/x" + folder + "/a.cpp"])
+        if rnd.random() < 0.9: ctx["resourcePath"] = rnd.choice(PATHS)
         out.append(ctx)
     for cmd, cond in esc:
         ks = cond.keys(); ks.pop("resourcePath", None)
         for _ in range(4000):
-            ctx = {"true": True, "resourcePath": folder + "/14216/14216.cpp"}; fill(ctx, ks, 0.6)
+            ctx = {"true": True, "resourcePath": rnd.choice(PATHS)}; fill(ctx, ks, 0.6)
             if cond.ev(ctx): out.append(ctx); break
         else:
             raise SystemExit("could not make a state for " + cmd)
@@ -207,59 +210,49 @@ def main(a):
     if a[0] == "parse":
         _, v = load(a[1]); print("entries", len(v)); return 0
     if a[0] == "same-user":
-        _, v = load(a[1]); _, o = load(a[2])
-        mine = [k for k in v if not is_ours(k)]
+        _, _, mine = split_ours(a[1]); _, o = load(a[2])
         if mine != o:
             print("user entries changed"); return 1
         print("user entries kept:", len(o)); return 0
+    if a[0] == "none":
+        text, ours, _ = split_ours(a[1])
+        if BEGIN in text or END in text or ours:
+            print("there is a vsc part"); return 1
+        print("no vsc part"); return 0
     if a[0] == "ours":
-        text, v = load(a[1]); rows = tsv_rows(a[2]); folders = a[3:]
-        ours = [k for k in v if is_ours(k)]
-        cond = folder_regex(folders)
-        want = [{"key": "shift+escape", "command": c, "when": ("(%s) && %s" % (w, cond)) if w else cond} for c, w in rows]
+        text, ours, _ = split_ours(a[1]); rows = tsv_rows(a[2])
+        want = [dict({"key": "shift+escape", "command": c}, **({"when": w} if w else {})) for c, w in rows]
         if ours != want:
             for x, y in zip(ours, want):
                 if x != y: print("got ", x); print("want", y); break
             print("vsc entries differ (%d, want %d)" % (len(ours), len(want))); return 1
-        if ours_marked(text) != len(ours) or text.count(BEGIN) != 1 or text.count(END) != 1:
-            print("vsc entries are not all inside one marked part"); return 1
-        for f in folders:
-            if ("// vsc-folder: " + f) not in text:
-                print("folder comment missing:", f); return 1
-        r = When(cond)
-        for f in folders:
-            for p, ok in ((f + "/14216/14216.cpp", True), (f + "/main.cpp", True), (f, False),
-                          (f + "2/main.cpp", False), ("/elsewhere" + f + "/a.cpp", False)):
-                if r.ev({"resourcePath": p}) != ok:
-                    print("regex wrong for", p); return 1
-        print("vsc entries ok:", len(ours), "folders", len(folders)); return 0
+        if text.count(BEGIN) != 1 or text.count(END) != 1:
+            print("not exactly one marked part"); return 1
+        part = text[text.find(BEGIN):text.find(END)]
+        if "resourcePath" in part or "vsc-folder" in part:
+            print("a folder condition is left"); return 1
+        print("vsc entries ok:", len(ours), "(no folder condition)"); return 0
     if a[0] == "states":
-        rows = tsv_rows(a[1]); folder = a[2]; count = int(a[3])
+        rows = tsv_rows(a[1]); count = int(a[2])
         esc = [(c, When(w if w else "true")) for c, w in rows]
-        print(json.dumps(make_states(esc, folder, count)))
+        print(json.dumps(make_states(esc, count)))
         return 0
     if a[0] == "simulate":
-        _, v = load(a[1]); rows = tsv_rows(a[2]); folder = a[3]; count = int(a[4])
+        _, v = load(a[1]); rows = tsv_rows(a[2]); count = int(a[3])
         esc = [(c, When(w if w else "true")) for c, w in rows]
         esc += [(k["command"], When(k.get("when") or "true")) for k in v if k.get("key") == "escape"]
-        sesc = [(k["command"], When(k.get("when") or "true"), is_ours(k)) for k in v if k.get("key") == "shift+escape"]
-        states = make_states(esc[:len(rows)], folder, count)
-        inside = outside = 0; won = set()
+        sesc = [(k["command"], When(k.get("when") or "true")) for k in v if k.get("key") == "shift+escape"]
+        states = make_states(esc[:len(rows)], count)
+        won = set(); ran = 0; noed = 0
         for ctx in states:
-            e = winner(esc, ctx); s_ = winner([(c, w) for c, w, _ in sesc], ctx)
-            if str(ctx.get("resourcePath", "")).startswith(folder + "/"):
-                inside += 1
-                if e is not None: won.add(e)
-                if e != s_:
-                    print("inside: Esc ->", e, "but Shift+Esc ->", s_); return 1
-            else:
-                outside += 1
-                mine = [c for c, w, o in sesc if o and w.ev(ctx)]
-                if mine:
-                    print("outside the folder a vsc rule matched:", mine[0]); return 1
-        print("simulated %d states inside (random ones and one per Esc rule, %d rules), %d outside: "
-              "Shift+Esc ran the same command as Esc every time (%d different commands)"
-              % (inside, len(rows), outside, len(won)))
+            e = winner(esc, ctx); s_ = winner(sesc, ctx)
+            if "resourcePath" not in ctx: noed += 1
+            if e is not None: won.add(e); ran += 1
+            if e != s_:
+                print("Esc ->", e, "but Shift+Esc ->", s_, "in", ctx); return 1
+        print("simulated %d states (random ones and one per Esc rule, %d rules; %d with no editor open): "
+              "Shift+Esc ran the same command as Esc every time (Esc ran a command in %d, %d different commands)"
+              % (len(states), len(rows), noed, ran, len(won)))
         return 0
     print(__doc__); return 2
 

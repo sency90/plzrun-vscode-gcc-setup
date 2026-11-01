@@ -4,7 +4,8 @@
 #  - 전역 명령 설치 (~/.local/bin): 짧은 이름 vsc + 옛 이름 plzrun-vscode-gcc-setup
 #    (둘 다 같은 setup.sh 를 부른다)
 #  - VSCode 디버깅용 확장 ms-vscode.cpptools 자동 설치
-#  - Shift+Esc = Esc 는 여기서 넣지 않는다. 폴더마다 vsc 를 칠 때 그 폴더용으로 넣는다
+#  - Shift+Esc = Esc 를 PC 전체로 켠다(사용자 keybindings.json 에 vsc 칸, 다시 돌려도 하나).
+#    끄기는 vsc -shift-esc off 또는 uninstall.sh. 폴더별 vsc 명령은 이 칸을 건드리지 않는다
 #  가정: VSCode + `code` CLI 사용 가능 (Windows 는 Remote-WSL 안에서 실행)
 #  사용법:  bash install.sh
 #  출력은 영어 (한글이 깨지는 터미널 대비)
@@ -76,7 +77,28 @@ else
     warn "'code' CLI not found; install the extension '$CPP_EXT' yourself (needed for F5)."
 fi
 
-# --- 4. PATH 안내 ---
+# --- 4. Shift+Esc = Esc (PC 전체, 사용자 keybindings.json 의 vsc 칸) ---
+#   v1.3.0 이 넣은 폴더 한정 칸이 있으면 PC 전체 칸으로 바꾼다. 사용자 항목은 그대로
+. "$SHARE_DIR/lib/keybindings.sh"
+kb="$(kb_path)"
+if [ -z "$kb" ]; then
+    warn "Shift+Esc was not set up (${KB_WHY}); add the keybindings in that VSCode yourself if you need them"
+    warn "  the list: $SHARE_DIR/templates/shift-esc.tsv"
+else
+    kb_update "$kb" "$SHARE_DIR/templates/shift-esc.tsv" on
+    case "$KB_STATUS" in
+        added)     log "Shift+Esc now works like Esc everywhere in VSCode (added the vsc part to $kb)" ;;
+        updated)   if [ -n "$KB_FOLDERS" ]; then
+                       log "Shift+Esc now works like Esc everywhere in VSCode (the old part was limited to some folders; rewrote it in $kb)"
+                   else
+                       log "Shift+Esc: rewrote the vsc part in $kb with this version's keybindings"
+                   fi ;;
+        unchanged) log "Shift+Esc already works like Esc everywhere in VSCode ($kb not changed)" ;;
+        refused)   warn "Shift+Esc was not set up: $KB_WHY ($kb was not changed)" ;;
+    esac
+fi
+
+# --- 5. PATH 안내 ---
 case ":$PATH:" in
     *":$BIN_DIR:"*) : ;;
     *) warn "~/.local/bin is not in PATH. Add it to your shell settings:"
@@ -87,4 +109,5 @@ echo
 log "done."
 echo "   use:       in a problem folder, run  $SHORT_NAME   (same as $CMD_NAME)"
 echo "   help:      $SHORT_NAME --help"
+echo "   Shift+Esc: $SHORT_NAME -shift-esc off   turns Shift+Esc = Esc off ($SHORT_NAME -shift-esc on turns it back on)"
 echo "   uninstall: bash uninstall.sh"

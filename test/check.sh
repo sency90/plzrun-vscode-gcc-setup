@@ -148,79 +148,147 @@ mkdir -p .vscode; printf '{ "version": "2.0.0", "tasks": [] }\n' > .vscode/tasks
 run vsc --remove
 echo "\$ ls .vscode"; ls .vscode
 
-echo; echo "################ Shift+Esc = Esc (user keybindings.json, test copy: $VSC_KEYBINDINGS)"
+echo; echo "################ Shift+Esc = Esc for the whole PC (user keybindings.json, test copy: $VSC_KEYBINDINGS)"
 KBC="python3 -I $HERE/kb_check.py"
 KB="$VSC_KEYBINDINGS"
 TSV="$REPO/templates/shift-esc.tsv"
+USER_FX="$HERE/fixtures/keybindings-user.jsonc"
+OLD_FX="$HERE/fixtures/keybindings-v1.3.0.jsonc"
 ORIG="$WORK/kb/orig.json"
-cp "$HERE/fixtures/keybindings-user.jsonc" "$KB"; cp "$KB" "$ORIG"
+cp "$USER_FX" "$KB"; cp "$KB" "$ORIG"
 same_as() { if cmp -s "$1" "$2"; then echo "same bytes: $(basename "$1") = $(basename "$2")"; else echo "DIFFERENT: $1 $2"; return 1; fi; }
+echo "--- project commands never add the part"
 cd "$WORK/poj"
 run vsc
+run vsc -lang c++17
+run vsc --init
+run vsc --remove
+run vsc
+cd "$WORK/ex"
+run vsc --remove
+run vsc
+run same_as "$KB" "$ORIG"
+run $KBC none "$KB"
+echo "--- -shift-esc on, alone, in a folder that is not set up: only keybindings.json changes"
+mkdir -p "$WORK/plain"; cd "$WORK/plain"
+run vsc -shift-esc on
+echo "\$ ls -A $WORK/plain"; ls -A "$WORK/plain"; [ -z "$(ls -A "$WORK/plain")" ] && echo "(empty)"
 run $KBC parse "$KB"
 run $KBC same-user "$KB" "$ORIG"
-run $KBC ours "$KB" "$TSV" "$WORK/poj"
-cp "$KB" "$WORK/kb/after-poj.json"
+run $KBC ours "$KB" "$TSV"
+cp "$KB" "$WORK/kb/after-on.json"
+run vsc -shift-esc on
+run same_as "$KB" "$WORK/kb/after-on.json"
+echo "--- project commands never change or remove the part"
+cd "$WORK/poj"
 run vsc
-run vsc -lang c++17
-run same_as "$KB" "$WORK/kb/after-poj.json"
+run vsc -stdin in2
+run vsc --init
+run vsc --remove
+run vsc
 cd "$WORK/ex"
+run vsc --remove
 run vsc
-run $KBC ours "$KB" "$TSV" "$WORK/poj" "$WORK/ex"
-run $KBC same-user "$KB" "$ORIG"
-run $KBC simulate "$KB" "$TSV" "$WORK/poj" 20000
-run $KBC simulate "$KB" "$TSV" "$WORK/ex" 5000
+run same_as "$KB" "$WORK/kb/after-on.json"
+echo "--- Shift+Esc = Esc in every state, any file or no editor"
+run $KBC simulate "$KB" "$TSV" 20000
 # 같은 상태들을 설치된 VSCode 의 조건식 분석기와 평가기로 (node 가 없거나 VSCode 가 없으면 건너뜀)
 if command -v node >/dev/null 2>&1; then
-    $KBC states "$TSV" "$WORK/poj" 20000 > "$WORK/kb/states.json"
-    run node "$HERE/vscode_when.js" "$KB" "$TSV" "$WORK/kb/states.json" "$WORK/poj"
+    $KBC states "$TSV" 20000 > "$WORK/kb/states.json"
+    run node "$HERE/vscode_when.js" "$KB" "$TSV" "$WORK/kb/states.json"
 else
     echo "node not found: skipped the check with VSCode's own when-clause parser"
 fi
-cd "$WORK/poj"
-run vsc --remove
-run $KBC ours "$KB" "$TSV" "$WORK/ex"
-cd "$WORK/ex"
-run vsc --remove
+echo "--- -shift-esc off, alone"
+cd "$WORK/plain"
+run vsc -shift-esc off
 run same_as "$KB" "$ORIG"
+run vsc -shift-esc off
+run same_as "$KB" "$ORIG"
+echo "--- option forms"
+run vsc -shift-esc=on
+run vsc -shift-esc OFF
+run same_as "$KB" "$ORIG"
+run vsc --shift-esc on
+run vsc --shift-esc=on
+run vsc -shift-esc
+run vsc -shift-esc -lang c++17
+run vsc -shift-esc maybe
+run vsc -shift-esc onn
+run vsc -shift-esc of
+run vsc -shiftesc on
+run vsc --shift-es
+run same_as "$KB" "$ORIG"
+echo "\$ ls -A $WORK/plain"; ls -A "$WORK/plain"; [ -z "$(ls -A "$WORK/plain")" ] && echo "(empty)"
+echo "--- with folder options: both happen, each on its own"
+cd "$WORK/poj"
+run vsc -shift-esc on -lang c++17
+run $KBC ours "$KB" "$TSV"
+run vsc --remove -shift-esc off
+run same_as "$KB" "$ORIG"
+run vsc
+echo "--- the v1.3.0 folder-only part"
+cp "$OLD_FX" "$KB"; cp "$KB" "$WORK/kb/v130.json"
+echo "(expected to fail: v1.3.0 limited Shift+Esc to two folders)"
+run $KBC simulate "$KB" "$TSV" 2000
+run vsc --remove
+run vsc
+run same_as "$KB" "$WORK/kb/v130.json"
+run vsc -shift-esc on
+run $KBC same-user "$KB" "$USER_FX"
+run $KBC ours "$KB" "$TSV"
+run $KBC simulate "$KB" "$TSV" 2000
+cp "$OLD_FX" "$KB"
+run vsc -shift-esc off
+run same_as "$KB" "$USER_FX"
 echo "--- no keybindings.json yet"
 rm -f "$KB"
-cd "$WORK/poj"
-run vsc
+run vsc -shift-esc off
+run vsc -shift-esc on
 run $KBC parse "$KB"
-run $KBC ours "$KB" "$TSV" "$WORK/poj"
-run vsc --remove
+run $KBC ours "$KB" "$TSV"
+run vsc -shift-esc off
 run $KBC parse "$KB"
 echo "--- empty array [] without a final newline"
 printf '[]' > "$KB"; cp "$KB" "$ORIG"
-run vsc
+run vsc -shift-esc on
 run $KBC parse "$KB"
-run vsc --remove
+run vsc -shift-esc off
 run same_as "$KB" "$ORIG"
 echo "--- an entry on the same line as ["
 printf '[{ "key": "f1", "command": "x" }]\n' > "$KB"; cp "$KB" "$ORIG"
-run vsc
+run vsc -shift-esc on
 run $KBC same-user "$KB" "$ORIG"
-run $KBC ours "$KB" "$TSV" "$WORK/poj"
-run vsc --remove
+run $KBC ours "$KB" "$TSV"
+run vsc -shift-esc off
 run same_as "$KB" "$ORIG"
 echo "--- not a JSON array: left alone"
 printf '{ "oops": 1 }\n' > "$KB"; cp "$KB" "$ORIG"
-run vsc
+run vsc -shift-esc on
 run same_as "$KB" "$ORIG"
 echo "--- a begin line without an end line: left alone"
 printf '[\n    // >>> vsc shift+escape (plzrun-vscode-gcc-setup)\n]\n' > "$KB"; cp "$KB" "$ORIG"
-run vsc
+run vsc -shift-esc on
+run vsc -shift-esc off
 run same_as "$KB" "$ORIG"
-echo "--- uninstall.sh takes the whole part out (fake HOME)"
-cp "$HERE/fixtures/keybindings-user.jsonc" "$KB"; cp "$KB" "$ORIG"
-run vsc
-cd "$WORK/ex"; run vsc
-mkdir -p "$WORK/home"
+echo "--- install.sh puts the part in (replacing a v1.3.0 part), uninstall.sh takes it out (fake HOME, stand-in code CLI)"
+mkdir -p "$WORK/home" "$WORK/stub"
+printf '#!/bin/sh\nexit 0\n' > "$WORK/stub/code"; chmod +x "$WORK/stub/code"
+cp "$OLD_FX" "$KB"
+run env HOME="$WORK/home" PATH="$WORK/stub:$PATH" bash "$REPO/install.sh"
+run $KBC same-user "$KB" "$USER_FX"
+run $KBC ours "$KB" "$TSV"
+cp "$KB" "$WORK/kb/after-install.json"
+run env HOME="$WORK/home" PATH="$WORK/stub:$PATH" bash "$REPO/install.sh"
+run same_as "$KB" "$WORK/kb/after-install.json"
+echo "(the installed vsc, run from its copy in the fake HOME)"
+run "$WORK/home/.local/bin/vsc" -shift-esc off
+run "$WORK/home/.local/bin/vsc" -shift-esc on
+run same_as "$KB" "$WORK/kb/after-install.json"
 run env HOME="$WORK/home" bash "$REPO/uninstall.sh"
-run same_as "$KB" "$ORIG"
-cd "$WORK/poj"; run vsc --remove; cd "$WORK/ex"; run vsc --remove
-cp "$HERE/fixtures/keybindings-user.jsonc" "$KB"
+run same_as "$KB" "$USER_FX"
+run env HOME="$WORK/home" bash "$REPO/uninstall.sh"
+cp "$USER_FX" "$KB"
 
 echo; echo "################ help"
 run vsc --help

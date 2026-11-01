@@ -12,8 +12,8 @@ C/C++ 문제 폴더에 **VSCode 빌드, 실행, 디버그 세팅(`.vscode/`)을 
 
 ```bash
 cd ~/github/plzrun-vscode-gcc-setup
-bash install.sh      # 명령 vsc, plzrun-vscode-gcc-setup 설치 + cpptools 확장 설치
-bash uninstall.sh    # 명령 제거 (각 폴더의 .vscode/ 는 그대로)
+bash install.sh      # 명령 vsc, plzrun-vscode-gcc-setup 설치 + cpptools 확장 설치 + Shift+Esc = Esc 켜기
+bash uninstall.sh    # 명령 제거 + Shift+Esc = Esc 끄기 (각 폴더의 .vscode/ 는 그대로)
 ```
 
 - 이미 다른 프로그램이 `~/.local/bin/vsc` 를 쓰고 있으면 덮지 않고 알린다. 그때는 옛 이름으로 쓰면 된다.
@@ -50,12 +50,14 @@ vsc -stdin in2 -stdout out2  # 여러 개를 한 번에
 vsc -stdout default          # 하나만 기본값으로
 vsc --init                   # 모든 설정을 처음 상태로 (새 문제 시작)
 vsc --remove                 # vsc 가 만든 파일 지우기 (설정이 꼬였을 때 지우고 다시 vsc)
+vsc -shift-esc on            # Shift+Esc = Esc 켜기 (PC 전체, 폴더와 상관없음)
+vsc -shift-esc off           # Shift+Esc = Esc 끄기
 vsc --help
 ```
 
 옵션 규칙은 하나다.
 
-- 값이 붙는 옵션은 대시 하나: `-lang`, `-stdin`, `-stdout`
+- 값이 붙는 옵션은 대시 하나: `-lang`, `-stdin`, `-stdout`, `-shift-esc`
 - 값이 없는 옵션은 대시 둘: `--init`, `--remove`, `--ex`, `--single`, `--force`, `--help`
 
 그 밖의 규칙:
@@ -64,6 +66,7 @@ vsc --help
 - 입출력 파일 이름은 **지금 보고 있는 파일과 같은 폴더** 기준이다. `/` 로 시작하면 그 경로 그대로.
 - 문제 폴더(`poj/14216`) 안에서 `vsc -stdin in2` 를 쳐도 된다. 위쪽에서 세팅된 폴더(`poj`)를 찾아서 바꾼다.
 - 휴대폰 자동 고침으로 `—init` 처럼 긴 대시가 들어가도 `--init` 으로 읽는다.
+- `-shift-esc` 만 PC 전체 설정이다. 혼자 쓰면 폴더는 건드리지 않는다. 다른 옵션과 같이 쓰면 두 일을 따로 한다.
 
 ## 화면에 나오는 글 (예시)
 
@@ -182,25 +185,46 @@ single 방식:
 
 ## Shift+Esc = Esc
 
-- `vsc` 로 세팅한 폴더 안의 파일에서는 VSCode 의 Shift+Esc 가 Esc 와 똑같이 동작한다.
+- VSCode 어디서나 Shift+Esc 가 Esc 와 똑같이 동작한다. 폴더를 가리지 않는 **PC 전체 설정**이다.
   - Vim(VSCodeVim) 입력 모드 빠져나가기, 자동 완성 닫기, 찾기 창 닫기, 여러 커서 해제, 매개변수 힌트 닫기, 빠른 열기와 알림 닫기 등 Esc 의 일 전부다.
+- 켜고 끄는 곳은 정해져 있다.
+  - 켜기: `install.sh`, `vsc -shift-esc on`
+  - 끄기: `uninstall.sh`, `vsc -shift-esc off`
+  - 프로젝트 명령(`vsc`, `--init`, `--remove`)은 켜지도 끄지도 않는다. 폴더 10곳에서 세팅하고 그중 하나를 지워도 Shift+Esc 는 그대로다.
 - VSCode 는 단축키를 프로젝트(`.vscode/`) 단위로 두지 못한다. 단축키는 사용자 `keybindings.json` 하나에서만 읽는다.
-  - 그래서 `vsc` 가 사용자 `keybindings.json` 에 표시 주석(`// >>> vsc shift+escape` ~ `// <<< vsc shift+escape`)으로 묶은 칸을 넣는다.
-  - 칸 안 단축키마다 "Esc 의 원래 조건 && 파일이 그 폴더 안"(`resourcePath =~ /^(폴더)\//`) 조건이 붙는다. 다른 폴더에서는 Shift+Esc 가 예전 그대로다.
-- 사용자가 넣은 항목은 한 글자도 바꾸지 않는다. 칸은 배열 맨 앞에 들어간다.
-- 같은 폴더에서 다시 쳐도 칸은 하나다. 폴더가 여럿이면 칸 안 `// vsc-folder:` 줄에 모은다.
-- `vsc --remove` 는 그 폴더를 칸에서 뺀다. 마지막 폴더가 빠지면 칸이 통째로 빠지고 파일은 원래 바이트로 돌아간다. `uninstall.sh` 는 칸 전체를 뺀다.
-- 파일이 JSON 배열(`[`)로 시작하지 않거나 표시가 깨져 있으면 손대지 않고 경고만 낸다.
+  - 그래서 사용자 `keybindings.json` 에 표시 주석(`// >>> vsc shift+escape` ~ `// <<< vsc shift+escape`)으로 묶은 칸을 넣는다.
+  - 칸 안에는 Esc 단축키마다 같은 명령, 같은 조건의 Shift+Esc 가 하나씩 있다. 폴더 조건은 없다.
+- 사용자가 넣은 항목은 한 글자도 바꾸지 않는다. 칸은 배열 맨 앞에 들어간다. 사용자가 직접 Shift+Esc 를 묶어 두었으면 그쪽이 이긴다.
+- 다시 켜도 칸은 하나다. 끄면 칸이 통째로 빠지고 파일은 원래 바이트로 돌아간다.
+- v1.3.0 은 이 칸을 `vsc` 로 세팅한 폴더에서만 켜지게 넣었다(`// vsc-folder:` 줄, `resourcePath` 조건). 그 칸이 있으면 `install.sh` 나 `vsc -shift-esc on` 이 PC 전체 칸으로 바꾼다.
+- 파일이 JSON 배열(`[`)로 시작하지 않거나 표시가 깨져 있으면 손대지 않고 알린다.
 - 자리: macOS `~/Library/Application Support/Code/User/keybindings.json`, Linux `~/.config/Code/User/keybindings.json`. WSL 에서는 VSCode 단축키가 Windows 쪽에 있어서 넣지 않고 알린다.
 - Esc 단축키 목록은 `templates/shift-esc.tsv` 다. VSCode 1.143.1 기본 81개, 내장 copilot 1개, VSCodeVim 2개이고, `tools/gen-shift-esc.py` 로 다시 만든다.
-- 칸이 효과를 내는 때는 지금 보고 있는 편집기 파일이 그 폴더 안일 때다. 편집기가 하나도 열려 있지 않으면 Shift+Esc 는 VSCode 기본 동작을 따른다.
+
+```
+$ vsc -shift-esc on
+vsc: updated /Users/me/Library/Application Support/Code/User/keybindings.json
+  shift-esc: off -> on everywhere  (Shift+Esc works like Esc in all of VSCode)
+  added the vsc part with 84 keybindings; your own keybindings are kept
+
+$ vsc -shift-esc off
+vsc: updated /Users/me/Library/Application Support/Code/User/keybindings.json
+  shift-esc: on -> off  (Shift+Esc is back to VSCode's default)
+  removed the vsc part; your own keybindings are kept
+
+$ vsc --shift-esc on
+vsc: error: unknown option '--shift-esc'
+  options with a value use one dash: -shift-esc
+  example: vsc -shift-esc on    (vsc -shift-esc off turns it off)
+  values:  on off (Shift+Esc works like Esc in all of VSCode, or not)
+```
 
 ## 설정 파일과 지우기
 
 - 설정은 `.vscode/vsc.conf` 하나에 있다. `tasks.json`, `launch.json` 은 명령을 칠 때마다 이 설정으로 다시 만든다. 손으로 고치지 않는다.
 - `vsc` 가 만들지 않은 `tasks.json`, `launch.json` 이 이미 있으면 덮지 않고 멈춘다. 바꾸려면 `--force`. 백업 사본(`.bak`)은 만들지 않는다.
 - 옛 버전이 만든 파일은 이 도구 것으로 알아보고 새 형식으로 바꾼다.
-- `vsc --remove` 는 `vsc` 가 만든 파일(`vsc.conf`, `tasks.json`, `launch.json`, `vsc-f5-stdin`)만 지운다. 빌드한 실행 파일은 지우지 않는다. Shift+Esc 칸에서도 그 폴더를 뺀다.
+- `vsc --remove` 는 `vsc` 가 만든 파일(`vsc.conf`, `tasks.json`, `launch.json`, `vsc-f5-stdin`)만 지운다. 빌드한 실행 파일은 지우지 않는다. Shift+Esc 는 그대로다.
 
 ## 시험
 
@@ -211,7 +235,8 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
 - 두 폴더를 `test/work/` 로 복사해(원본은 읽기만) 모든 명령을 돌리고 출력을 남긴다.
 - Shift+Esc 칸은 시험용 `keybindings.json`(`VSC_KEYBINDINGS`)에만 쓴다. 실제 사용자 파일은 건드리지 않는다.
   - `test/kb_check.py`: 엄격한 JSON 읽기(주석 빼고 끝 쉼표 없음), 사용자 항목 그대로, Esc 규칙마다 vsc 항목 하나.
-  - 같은 파일로 무작위 상태 2만 개와 Esc 규칙마다 그 규칙이 이기는 상태 하나씩을 만든다. 폴더 안에서는 Shift+Esc 가 Esc 와 같은 명령을 고르고, 폴더 밖에서는 vsc 규칙이 하나도 걸리지 않아야 한다.
+  - 같은 파일로 무작위 상태 2만 개와 Esc 규칙마다 그 규칙이 이기는 상태 하나씩을 만든다. 어느 파일을 보든, 편집기가 하나도 없든 Shift+Esc 가 Esc 와 같은 명령을 골라야 한다.
+  - 프로젝트 명령 앞뒤로 파일이 바이트까지 같은지, `install.sh` 와 `uninstall.sh` 를 가짜 HOME 으로 돌렸을 때 칸이 들고 나는지도 본다.
   - `test/vscode_when.js`: 같은 검사를 설치된 VSCode 본체의 조건식 분석기와 평가기로 한다(본체 번들에서 그 부분을 떼어 node 로 돌림).
 - `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS). Ctrl+F5 는 cpptools 1.34.4 가 만드는 것과 같은 터미널 명령 줄을 셸로 돌린다.
 
@@ -222,7 +247,7 @@ plzrun-vscode-gcc-setup/
 ├── install.sh / uninstall.sh
 ├── setup.sh                 # 생성기 (vsc 명령의 본체)
 ├── lib/
-│   └── keybindings.sh       # Shift+Esc 칸 넣기와 빼기 (setup.sh, uninstall.sh 공용)
+│   └── keybindings.sh       # Shift+Esc 칸 넣기와 빼기 (setup.sh, install.sh, uninstall.sh 공용)
 ├── templates/
 │   ├── tasks.ex.json        # ex 방식 태스크
 │   ├── tasks.single.json    # single 방식 태스크
@@ -235,7 +260,7 @@ plzrun-vscode-gcc-setup/
 │   ├── vscode_sim.py
 │   ├── kb_check.py          # Shift+Esc 칸 검사
 │   ├── vscode_when.js       # 설치된 VSCode 의 조건식 분석기로 검사
-│   └── fixtures/keybindings-user.jsonc
+│   └── fixtures/            # 사용자 keybindings 예시, v1.3.0 이 넣은 폴더 한정 칸 예시
 ├── HOW_IT_WORKS.md
 ├── LICENSE                  # MIT
 └── README.md
