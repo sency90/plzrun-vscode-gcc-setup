@@ -5,3 +5,6 @@ pgm_debug
 *.o
 *.obj
 *.bak
+
+# 시험용 복사본 (test/check.sh 가 만든다)
+test/work/
