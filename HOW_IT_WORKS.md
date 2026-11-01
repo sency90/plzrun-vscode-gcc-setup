@@ -47,9 +47,14 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
   - 한 파일이 양쪽 다 커버.
 - `cppdbg` 타입은 **`ms-vscode.cpptools` 확장**이 있어야 동작 → install.sh가 자동 설치.
 - **F5 입력 파일**: launch.json 은 "파일이 있을 때만 리다이렉트" 같은 조건을 못 쓴다. 그래서 preLaunchTask(`vsc: prepare F5`)가 입력 파일을 `.vscode/vsc-f5-stdin` 으로 복사하고(없으면 빈 파일 + 경고), 디버거는 늘 그 사본을 읽는다.
-  - gdb: `"args": ["<", ".../vsc-f5-stdin"]`. gdb 는 셸을 거쳐 프로그램을 띄우므로 리다이렉트가 먹는다.
-  - lldb: 인자가 셸을 안 거쳐 `<` 가 그대로 argv 로 간다. 대신 `setupCommands` 에 `settings set target.input-path` 를 넣는다. cpptools 는 `-` 로 시작하지 않는 setupCommands 를 `-interpreter-exec console` 로 보내고, 타깃을 만들기 전에 넣은 설정도 새 타깃에 이어진다(lldb-mi 로 직접 확인).
-  - 출력 파일은 gdb `> out`, lldb `target.output-path`.
+  - 모든 OS 공통 `"args": ["<", ".../vsc-f5-stdin"]` (출력 파일이 있으면 `">", ".../out2"` 도).
+  - gdb F5: gdb 는 셸을 거쳐 프로그램을 띄우므로 리다이렉트가 먹는다.
+  - lldb F5: 인자가 셸을 안 거쳐 `<` 가 그대로 argv 로 간다. 그래서 `setupCommands` 에 `settings set target.input-path` (출력은 `target.output-path`)를 더 넣는다. cpptools 는 `-` 로 시작하지 않는 setupCommands 를 `-interpreter-exec console` 로 보내고, 타깃을 만들기 전에 넣은 설정도 새 타깃에 이어진다(lldb-mi 로 직접 확인).
+- **Ctrl+F5 (Run Without Debugging)**: cpptools 1.34.4 는 noDebug 실행을 디버거에 보내지 않는다. `dist/src/main.js` 의 `RunWithoutDebuggingAdapter` 가 터미널에서 `program args` 를 바로 실행한다.
+  - 이 경로는 `program`, `args`, `cwd`, `environment`, `console`/`externalConsole` 만 읽는다. `setupCommands` 와 `MIMode` 는 쓰지 않는다.
+  - 셸 통합이 있으면 VSCode `executeCommand(program, args)` 로, 없으면 `buildShellCommandLine` 으로 명령 줄을 만든다. 둘 다 빈칸 있는 인자만 따옴표로 감싸므로 `<`, `>` 는 셸이 리다이렉트로 받는다.
+  - v1.2.0 은 macOS 입력을 `setupCommands` 에만 넣어서 Ctrl+F5 에서 입력 파일이 빠졌다(task369). 그래서 `args` 를 모든 OS 공통으로 옮겼다.
+  - VSCode 는 `"osx"`/`"linux"` 블록의 키를 맨 위 키에 얕게 덮어쓴다. 블록에 `args` 를 두지 않아야 공통 `args` 가 남는다.
 
 > "tasks/launch가 뭐냐": VSCode가 정한 표준 설정 파일. tasks.json = "이런 빌드/실행 명령들을 단축키/메뉴로 제공해라". launch.json = "F5 누르면 이렇게 디버깅 시작해라". 둘 다 그냥 JSON 텍스트라 사람이 읽고 고칠 수 있다.
 

@@ -171,10 +171,12 @@ single 방식:
 ## 디버깅 (`.vscode/launch.json`)
 
 - **F5** -> `vsc: prepare F5` (debug 빌드 + 입력 준비) 후 디버깅.
-- F5 도 `-stdin`, `-stdout` 설정을 따른다.
+- **Ctrl+F5** (Run Without Debugging) -> 같은 준비 뒤 디버거 없이 터미널에서 실행.
+- F5 와 Ctrl+F5 모두 `-stdin`, `-stdout` 설정을 따른다.
   - 준비 단계가 입력 파일을 `.vscode/vsc-f5-stdin` 으로 복사한다. 입력 파일이 없으면 빈 파일을 두고 경고한다.
-  - Linux/WSL `gdb`: `args` 에 `< .vscode/vsc-f5-stdin` (출력 파일이 있으면 `> out2`).
-  - macOS `lldb`: `settings set target.input-path` (출력은 `target.output-path`).
+  - `args` 에 `< .vscode/vsc-f5-stdin` (출력 파일이 있으면 `> out2`). Linux/WSL `gdb` 의 F5 와 모든 OS 의 Ctrl+F5 는 이 줄을 셸로 돌리므로 리다이렉트가 먹는다.
+  - macOS `lldb` 의 F5 는 `args` 를 셸로 돌리지 않는다. 그래서 `settings set target.input-path` (출력은 `target.output-path`)로 따로 넣는다.
+  - 이 때문에 macOS F5 에서는 프로그램 argv 에 `<` 와 파일 이름이 함께 들어간다. argv 를 읽지 않는 풀이에는 상관없다.
 - 필요 확장: `ms-vscode.cpptools` (install.sh 가 설치).
 - Linux/WSL 에서 F5 를 쓰려면 `gdb` 가 있어야 한다(빌드와 실행에는 필요 없다).
 
@@ -192,7 +194,7 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
 ```
 
 - 두 폴더를 `test/work/` 로 복사해(원본은 읽기만) 모든 명령을 돌리고 출력을 남긴다.
-- `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS).
+- `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS). Ctrl+F5 는 cpptools 1.34.4 가 만드는 것과 같은 터미널 명령 줄을 셸로 돌린다.
 
 ## 구성
 
