@@ -92,6 +92,21 @@ run vsc -stdin in9 -stdout default
 run $SIM f5-lldb . "$F"
 run vsc --init
 
+echo; echo "################ poj: Ctrl+F5 (Run Without Debugging, command line as cpptools builds it)"
+run $SIM ctrl-f5 . "$F" osx /bin/zsh
+run vsc -stdin in2
+run $SIM ctrl-f5 . "$F" osx /bin/zsh
+run vsc -stdout out2
+rm -f "$WORK/poj/$PROB/out2"
+run $SIM ctrl-f5 . "$F" osx /bin/zsh
+echo "\$ cat $PROB/out2"; cat "$WORK/poj/$PROB/out2"
+rm -f "$WORK/poj/$PROB/out2"
+run $SIM ctrl-f5 . "$F" linux /bin/bash
+echo "\$ cat $PROB/out2"; cat "$WORK/poj/$PROB/out2"
+run vsc -stdin in9 -stdout default
+run $SIM ctrl-f5 . "$F" osx /bin/zsh
+run vsc --init
+
 echo; echo "################ poj: --single / --ex switching, --remove"
 run vsc --ex
 run vsc --single
@@ -112,6 +127,7 @@ run vsc --init
 run $SIM task . "$U" "run release"
 run $SIM task . "$U" "run exam (timed)"
 run $SIM f5-lldb . "$U"
+run $SIM ctrl-f5 . "$U" osx /bin/zsh
 run vsc --single
 run vsc --ex
 run vsc --remove
