@@ -156,9 +156,10 @@ Options with a value (one dash):
   -stdin <file>    input file, in the folder of the file you are viewing
                    (default '$DEF_STDIN')
   -stdout <file>   output file, in the same folder (default: the terminal)
-  Give 'default' as the value to go back to the default.
-  -shift-esc on|off   Shift+Esc works like Esc in all of VSCode, or not
+  -shift-esc <on|off>
+                   Shift+Esc works like Esc in all of VSCode, or not
                    (for the whole PC, not this folder; see below)
+  Give 'default' as the value of -lang, -stdin or -stdout to go back to the default.
 
 Options without a value (two dashes):
   --init     reset every setting to the default (for a new problem)
@@ -179,8 +180,8 @@ Without [folder], vsc uses the nearest folder above that is already set up
 (so 'vsc -stdin in2' inside poj/14216 changes the poj setup).
 Shift+Esc = Esc is one setting for the whole PC, not for a folder:
   $PROG -shift-esc on    Shift+Esc works like Esc everywhere in VSCode
-                        (Vim insert mode, suggestions, find, multiple cursors,
-                        and every other Esc)
+                      (Vim insert mode, suggestions, find, multiple cursors,
+                      and every other Esc)
   $PROG -shift-esc off   Shift+Esc goes back to VSCode's default
 install.sh turns it on and uninstall.sh turns it off. '$PROG', '--init' and
 '--remove' never change it. VSCode reads keybindings only from your user
