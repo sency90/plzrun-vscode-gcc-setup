@@ -4,6 +4,7 @@
 #  - 전역 명령 설치 (~/.local/bin): 짧은 이름 vsc + 옛 이름 plzrun-vscode-gcc-setup
 #    (둘 다 같은 setup.sh 를 부른다)
 #  - VSCode 디버깅용 확장 ms-vscode.cpptools 자동 설치
+#  - Shift+Esc = Esc 는 여기서 넣지 않는다. 폴더마다 vsc 를 칠 때 그 폴더용으로 넣는다
 #  가정: VSCode + `code` CLI 사용 가능 (Windows 는 Remote-WSL 안에서 실행)
 #  사용법:  bash install.sh
 #  출력은 영어 (한글이 깨지는 터미널 대비)
@@ -31,8 +32,9 @@ esac
 # --- 1. 생성기 + 템플릿을 share 에 복사 (repo 위치와 독립) ---
 mkdir -p "$SHARE_DIR"
 cp "$SCRIPT_DIR/setup.sh" "$SHARE_DIR/setup.sh"
-rm -rf "$SHARE_DIR/templates"
+rm -rf "$SHARE_DIR/templates" "$SHARE_DIR/lib"
 cp -R "$SCRIPT_DIR/templates" "$SHARE_DIR/templates"
+cp -R "$SCRIPT_DIR/lib" "$SHARE_DIR/lib"
 chmod +x "$SHARE_DIR/setup.sh"
 log "installed the generator: $SHARE_DIR"
 
