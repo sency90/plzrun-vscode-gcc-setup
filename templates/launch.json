@@ -5,8 +5,12 @@
     //   Debugger by OS: Linux/WSL = gdb, macOS = lldb (needs ms-vscode.cpptools).
     //   stdin:  @STDIN_NOTE@
     //   stdout: @STDOUT_NOTE@
+    //   Ctrl+F5 (Run Without Debugging): the same prepare step, then the program runs
+    //   in the terminal as "program args", so "args" below holds "< file" (and "> file").
     //   The prepare step copies the stdin file to .vscode/vsc-f5-stdin
-    //   (empty if the file is missing), and the debugger reads from that copy.
+    //   (empty if the file is missing), and F5 and Ctrl+F5 read from that copy.
+    //   macOS F5 (lldb) does not redirect "args", so setupCommands set the input too;
+    //   there the program also sees "<" and the file name in argv (harmless unless it reads argv).
     "version": "0.2.0",
     "configurations": [
         {
@@ -14,7 +18,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "@PROGRAM@",
-            "args": [],
+            "args": [@REDIRECT_ARGS@],
             "stopAtEntry": false,
             "cwd": "@CWD@",
             "externalConsole": false,
@@ -22,8 +26,7 @@
             "MIMode": "gdb",
             "linux": {
                 "MIMode": "gdb",
-                "miDebuggerPath": "/usr/bin/gdb",
-                "args": [@GDB_ARGS@]
+                "miDebuggerPath": "/usr/bin/gdb"
             },
             "osx": {
                 "MIMode": "lldb",

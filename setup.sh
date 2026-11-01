@@ -431,7 +431,7 @@ short_out()   { if [ -z "$1" ]; then printf 'terminal'; else printf '%s' "$1"; f
 #  tasks.json / launch.json 만들기
 # ----------------------------------------------------------------------------
 build_files() {
-    local in_e out_e exe f5in tpl t run_rel run_exam prep gdb lldb
+    local in_e out_e exe f5in tpl t run_rel run_exam prep redir lldb
     in_e="$(path_expr "$N_STDIN")"
     f5in="\${workspaceFolder}/.vscode/$F5_STDIN_NAME"
     if [ "$N_MODE" = "ex" ]; then exe_rel="\${workspaceFolder}/pgm_release"; exe_exam="\${workspaceFolder}/pgm_exam"
@@ -451,11 +451,12 @@ build_files() {
     [ "$N_MODE" = "ex" ] && run_exam="$(run_cmd "$exe_exam" "time ")"
     prep="if [ -f \"$in_e\" ]; then cp \"$in_e\" \"$f5in\"; echo \"vsc: F5 stdin = $in_e\"; else : > \"$f5in\"; echo \"vsc warning: stdin file not found: $in_e (F5 starts with empty input)\"; fi"
 
-    gdb="\"<\", \"$f5in\""
+    # F5 gdb 와 Ctrl+F5 는 args 를 셸에 넘기므로 리다이렉트가 먹는다. F5 lldb 는 setupCommands 로.
+    redir="\"<\", \"$f5in\""
     lldb="                    { \"description\": \"stdin\", \"text\": \"$(json_esc "settings set target.input-path \"$f5in\"")\" }"
     if [ -n "$N_STDOUT" ]; then
         out_e="$(path_expr "$N_STDOUT")"
-        gdb="$gdb, \">\", \"$out_e\""
+        redir="$redir, \">\", \"$out_e\""
         lldb="$lldb,
                     { \"description\": \"stdout\", \"text\": \"$(json_esc "settings set target.output-path \"$out_e\"")\" }"
     fi
@@ -485,7 +486,7 @@ build_files() {
     fi
     t="$(subst "$t" "@STDIN_NOTE@" "$note_in")"
     t="$(subst "$t" "@STDOUT_NOTE@" "$note_out")"
-    t="$(subst "$t" "@GDB_ARGS@" "$gdb")"
+    t="$(subst "$t" "@REDIRECT_ARGS@" "$redir")"
     t="$(subst "$t" "@LLDB_SETUP@" "$lldb")"
     NEW_LAUNCH="$t"
 
