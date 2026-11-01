@@ -5,6 +5,10 @@
   vscode_sim.py f5-lldb <workspace> <viewed file>          F5 on macOS: preLaunchTask, then
                                                           lldb-mi driven like cpptools does
   vscode_sim.py f5-gdb  <workspace> <viewed file>          F5 on Linux: print the gdb run line
+  vscode_sim.py ctrl-f5 <workspace> <viewed file> <os> [shell]
+                                                          Ctrl+F5 (Run Without Debugging) on
+                                                          osx or linux: preLaunchTask, then the
+                                                          terminal command line cpptools builds
 
 Variables substituted like VSCode: ${workspaceFolder} ${file} ${fileDirname}
 ${fileBasename} ${fileBasenameNoExtension}. Only for tests; vsc itself needs no python.
@@ -151,6 +155,43 @@ def f5_gdb(ws, f):
     print(">   same as: gdb -ex 'run %s' %s" % (" ".join(c["args"]), shlex.quote(c["program"])))
 
 
+def ctrl_f5_cmdline(c):
+    """The terminal command line for Ctrl+F5, built the way cpptools 1.34.4 builds it.
+
+    cpptools sends a noDebug launch of a cppdbg config to RunWithoutDebuggingAdapter
+    (dist/src/main.js). It reads only program, args, cwd, environment and
+    console/externalConsole; setupCommands, MIMode and the debugger never run.
+    With shell integration it calls VSCode's shellIntegration.executeCommand(program,
+    args), which appends each arg as is, or wrapped in "..." if it has whitespace and
+    no quote (extensionHostProcess.js). Without shell integration it sends
+    buildShellCommandLine('', program, args, true), which also quotes ('...') only
+    args with a space. Either way "<" and ">" reach the shell unquoted.
+    """
+    prog, args = c["program"], c.get("args", [])
+    with_si = '"%s"' % prog if (not re.search(r"[\"']", prog) and re.search(r"\s", prog)) else prog
+    for a in args:
+        with_si += ' "%s"' % a if (not re.search(r"[\"'`]", a) and re.search(r"\s", a)) else " " + a
+    no_si = " ".join("'%s'" % x if " " in x and not re.match(r"^(['\"]).*\1$", x) else x
+                     for x in [prog] + args)
+    return with_si, no_si
+
+
+def ctrl_f5(ws, f, osname, shell):
+    c = launch_config(ws, f, osname)
+    rc = run_task(ws, f, c["preLaunchTask"])
+    if rc:
+        sys.exit("preLaunchTask failed: %d" % rc)
+    with_si, no_si = ctrl_f5_cmdline(c)
+    print("> Ctrl+F5 (%s): setupCommands are not used; terminal cwd %s" % (osname, c["cwd"]))
+    print(">   shell integration:    " + with_si)
+    print(">   no shell integration: " + no_si)
+    for name, line in (("shell integration", with_si), ("no shell integration", no_si)):
+        print("> %s -c <%s line>, terminal input is /dev/null:" % (shell, name))
+        sys.stdout.flush()
+        rc = subprocess.call([shell, "-c", line], cwd=c["cwd"], stdin=subprocess.DEVNULL)
+        print("> exit %d" % rc)
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         sys.exit(__doc__)
@@ -161,5 +202,7 @@ if __name__ == "__main__":
         f5_lldb(ws, f)
     elif cmd == "f5-gdb":
         f5_gdb(ws, f)
+    elif cmd == "ctrl-f5":
+        ctrl_f5(ws, f, sys.argv[4], sys.argv[5] if len(sys.argv) > 5 else "/bin/zsh")
     else:
         sys.exit(__doc__)
