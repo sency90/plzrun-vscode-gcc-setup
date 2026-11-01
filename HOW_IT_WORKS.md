@@ -5,7 +5,10 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
 ---
 
 ## 0. 목적
-새 sw_expert 문제 폴더(= `main.cpp` + `user.cpp`)에서 명령 한 줄이면 `.vscode/`가 생겨서, 바로 빌드(`Ctrl+Shift+B`)·디버그(`F5`)·실행이 되게 하는 것. 매번 다른 프로젝트에서 `.vscode` 복사해와서 고치던 걸 자동화.
+새 문제 폴더에서 명령 한 줄(`vsc`)이면 `.vscode/`가 생겨서, 바로 빌드(`Ctrl+Shift+B`), 디버그(`F5`), 실행이 되게 하는 것. 매번 다른 프로젝트에서 `.vscode` 복사해와서 고치던 걸 자동화.
+
+- 처음엔 sw_expert 폴더(`main.cpp` + `user.cpp`, ex 방식)만 가정했다.
+- 2026-11 에 BOJ/poj 처럼 파일 하나로 푸는 폴더(single 방식)와, 세팅 뒤 같은 명령으로 언어와 입출력을 바꾸는 기능을 더했다.
 
 ---
 
@@ -16,7 +19,13 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
 
 ---
 
-## 2. 생성되는 `.vscode/` 두 파일
+## 2. 생성되는 `.vscode/` 파일
+
+- `vsc.conf`: 설정 원본(mode, lang, stdin, stdout 네 줄).
+- `tasks.json`, `launch.json`: `vsc.conf` 값으로 `templates/` 를 채워 매번 다시 만든다.
+- `vsc-f5-stdin`: F5 직전에 입력 파일을 복사해 두는 곳(아래 launch.json 참고).
+
+아래 표는 ex 방식 기준이다. single 방식은 `main.cpp` 없이 `${file}` 하나를 빌드하고, 실행 파일을 그 파일 옆에 파일 이름대로 만든다(`${fileDirname}/${fileBasenameNoExtension}`). 빌드는 release(-O2), debug(-g) 둘.
 
 ### `tasks.json` — 빌드 3종 (`templates/tasks.json`)
 | 용도 | 컴파일 | 산출물 |
@@ -27,7 +36,8 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
 
 - **`${file}`** = "지금 편집기에서 포커스한 파일". VSCode가 빌드 시 실제 파일 경로로 치환해준다. 그래서 `user.cpp` 고정이 아니라, 보고 있는 풀이 파일(`score_455_mojo.cpp` 등)이 컴파일된다. `main.cpp`은 항상 들어가고 불변.
 - `*.cpp` 전체가 아니라 **`main.cpp` + `${file}` 둘만** 컴파일 → 같은 폴더의 다른 풀이 .cpp끼리 심볼 충돌 방지.
-- 왜 `c++14`인가: sw_expert `main.cpp`가 `register` 키워드를 쓰는데, **C++17은 `register`가 제거돼 에러**. 그래서 c++14 고정.
+- 왜 기본이 `c++14`인가: sw_expert `main.cpp`가 `register` 키워드를 쓰는데, **C++17은 `register`가 제거돼 에러**. 그래서 기본은 c++14 이고, `vsc -lang c++17` 로 바꿀 수 있다.
+- run 태스크는 `/bin/bash -c` 로 돈다. 입력 파일이 있으면 `< in`, 없으면 리다이렉트 없이 돌리고 경고 한 줄. 사용자 기본 셸(zsh, fish)과 상관없이 같은 문법이 통하게 하려고 셸을 정해 둔다.
 
 ### `launch.json` — F5 디버깅 (`templates/launch.json`)
 - `F5` → `preLaunchTask`로 debug 빌드 후 `pgm_debug` 디버깅.
@@ -36,6 +46,10 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
   - macOS → `lldb`
   - 한 파일이 양쪽 다 커버.
 - `cppdbg` 타입은 **`ms-vscode.cpptools` 확장**이 있어야 동작 → install.sh가 자동 설치.
+- **F5 입력 파일**: launch.json 은 "파일이 있을 때만 리다이렉트" 같은 조건을 못 쓴다. 그래서 preLaunchTask(`vsc: prepare F5`)가 입력 파일을 `.vscode/vsc-f5-stdin` 으로 복사하고(없으면 빈 파일 + 경고), 디버거는 늘 그 사본을 읽는다.
+  - gdb: `"args": ["<", ".../vsc-f5-stdin"]`. gdb 는 셸을 거쳐 프로그램을 띄우므로 리다이렉트가 먹는다.
+  - lldb: 인자가 셸을 안 거쳐 `<` 가 그대로 argv 로 간다. 대신 `setupCommands` 에 `settings set target.input-path` 를 넣는다. cpptools 는 `-` 로 시작하지 않는 setupCommands 를 `-interpreter-exec console` 로 보내고, 타깃을 만들기 전에 넣은 설정도 새 타깃에 이어진다(lldb-mi 로 직접 확인).
+  - 출력 파일은 gdb `> out`, lldb `target.output-path`.
 
 > "tasks/launch가 뭐냐": VSCode가 정한 표준 설정 파일. tasks.json = "이런 빌드/실행 명령들을 단축키/메뉴로 제공해라". launch.json = "F5 누르면 이렇게 디버깅 시작해라". 둘 다 그냥 JSON 텍스트라 사람이 읽고 고칠 수 있다.
 
@@ -52,19 +66,24 @@ uninstall.sh    ← 명령/복사본 제거
 
 ### `setup.sh` 가 하는 일
 1. **자기 위치를 심링크까지 따라가 해석**해서 `templates/`를 찾는다(설치 후 `~/.local/bin`의 명령이 심링크/래퍼여도 원본 templates를 찾도록).
-2. 대상 폴더에 `.vscode/` 만들고, 기존 `tasks.json`/`launch.json`이 있으면 `.bak`로 백업 후 템플릿 복사.
-3. `main.cpp`/`user.cpp` 없으면 경고만(생성은 진행).
-   - 템플릿은 변수 치환이 거의 없어서 **그냥 복사**면 됨 → python도 필요 없이 `cp`로 끝.
+2. 인자를 읽는다. 값 있는 옵션은 대시 하나, 값 없는 옵션은 대시 둘. 모르는 옵션이나 값은 거리(글자 바꾸기, 넣기, 빼기, 이웃 두 글자 뒤바꾸기)가 가장 가까운 것을 `Did you mean` 으로 알려 주고 아무것도 바꾸지 않는다. 거리 계산은 `awk` 로 한다.
+3. 대상 폴더를 정한다. 폴더를 안 주면 현재 폴더. 다만 현재 폴더에 `main.cpp` 도 `.vscode/` 도 없으면(poj/14216 같은 문제 폴더) 위로 올라가 `vsc.conf` 가 있는 폴더를 쓴다(git 이 `.git` 을 찾는 것과 같다).
+4. `vsc.conf` 를 읽고(없으면 첫 세팅), `--init`, `--ex`, `--single`, `-lang`, `-stdin`, `-stdout` 순으로 새 값을 정한다.
+5. `templates/` 의 `@STD@` 같은 자리를 채워 `tasks.json`, `launch.json` 을 만든다. 내용이 같으면 파일을 건드리지 않는다.
+6. 이 도구가 만들지 않은 `tasks.json`, `launch.json` 이 있으면 `--force` 없이 덮지 않는다. 옛 버전처럼 `.bak` 를 만들지 않는다(사본이 쌓여 헷갈렸다).
+7. 바뀐 값을 `old -> new` 로 출력한다. 출력은 전부 영어.
+   - 치환은 `${var//a/b}` 대신 직접 짠 함수로 한다. bash 5.2 는 바꿀 말 안의 `&` 를 특별하게 다뤄서 `>&2` 같은 명령이 깨진다.
+   - macOS 기본 bash 3.2 에서도 돌게 연관 배열, `${var,,}` 같은 새 문법을 쓰지 않는다.
 
 ### `install.sh` 가 하는 일
 1. `g++`/`gdb`(Linux)/`lldb`(mac) 존재를 점검(없으면 빌드/디버그 시 곤란하다고 경고).
 2. 생성기(setup.sh + templates)를 `~/.local/share/plzrun-vscode-gcc-setup/`에 복사.
-3. `~/.local/bin/plzrun-vscode-gcc-setup` 래퍼 생성 → 위 setup.sh를 현재 폴더에서 실행.
+3. `~/.local/bin/vsc` 와 `~/.local/bin/plzrun-vscode-gcc-setup` 래퍼 생성 → 둘 다 위 setup.sh를 현재 폴더에서 실행. 같은 이름의 다른 프로그램이 이미 있으면 덮지 않고 알린다.
 4. `ms-vscode.cpptools` 확장 설치(`code --install-extension`).
 5. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
 
 ### `uninstall.sh`
-- `~/.local/bin`의 명령 + `~/.local/share/...` 복사본 제거.
+- `~/.local/bin`의 명령 두 개(이 도구 래퍼만) + `~/.local/share/...` 복사본 제거.
 - **cpptools는 범용 확장이라 제거하지 않음**(다른 C++ 작업에 쓰일 수 있으니). 이미 생성된 각 프로젝트의 `.vscode/`도 사용자 자산이라 그대로 둠.
 
 ---
@@ -75,15 +94,17 @@ uninstall.sh    ← 명령/복사본 제거
 cd ~/github/plzrun-vscode-gcc-setup && bash install.sh
 
 # 그 다음부터, 새 문제 폴더에서 한 줄
-plzrun-vscode-gcc-setup        # → ./.vscode 생성
+vsc                 # → ./.vscode 생성 (옛 이름 plzrun-vscode-gcc-setup 도 같다)
+vsc -stdin in2      # 입력 파일 바꾸기
+vsc --init          # 새 문제: 설정을 처음 상태로
 ```
-그 폴더를 VSCode로 열고(회사면 Remote-WSL): `Ctrl+Shift+B`(release 빌드) / `F5`(debug 디버깅) / 터미널 태스크로 `run exam (timed)` 등.
+그 폴더를 VSCode로 열고(회사면 Remote-WSL): `Ctrl+Shift+B`(release 빌드) / `F5`(debug 디버깅) / 터미널 태스크로 `run release`, `run exam (timed)` 등.
 
 ---
 
 ## 5. 의존성 / 라이선스
-- 의존: `bash`, `g++`(C++14), `code` CLI, (디버깅 시)`gdb`/`lldb`, (확장)`ms-vscode.cpptools`.
-- 패키지매니저/네트워크 불필요(생성기는 파일 복사뿐).
+- 의존: `bash`, `awk`, `g++`, `code` CLI, (디버깅 시)`gdb`/`lldb`, (확장)`ms-vscode.cpptools`.
+- 패키지매니저/네트워크 불필요(생성기는 템플릿 채우기뿐). 시험 도구 `test/vscode_sim.py` 만 python3 를 쓴다.
 - 라이선스: MIT.
 
 ---
