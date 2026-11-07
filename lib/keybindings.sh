@@ -19,15 +19,16 @@ KB_END="// <<< vsc shift+escape"
 kb_path() {
     KB_WHY=""
     if [ -n "${VSC_KEYBINDINGS:-}" ]; then printf '%s' "$VSC_KEYBINDINGS"; return 0; fi
-    case "$(uname -s)" in
+    # 시험(test/kb_platform.sh)만 VSC_TEST_UNAME, VSC_TEST_PROC_VERSION 으로 운영체제와 /proc/version 을 바꿔 끼운다(맥에서 WSL 흉내)
+    case "${VSC_TEST_UNAME:-$(uname -s)}" in
         Darwin) printf '%s' "$HOME/Library/Application Support/Code/User/keybindings.json" ;;
         Linux)
-            if grep -qi microsoft /proc/version 2>/dev/null; then
+            if grep -qi microsoft "${VSC_TEST_PROC_VERSION:-/proc/version}" 2>/dev/null; then
                 KB_WHY="WSL: VSCode keeps its keybindings on the Windows side"
                 return 0
             fi
             printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/keybindings.json" ;;
-        *) KB_WHY="unsupported system $(uname -s)" ;;
+        *) KB_WHY="unsupported system ${VSC_TEST_UNAME:-$(uname -s)}" ;;
     esac
 }
 
