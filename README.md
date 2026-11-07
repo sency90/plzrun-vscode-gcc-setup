@@ -238,6 +238,13 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
   - 같은 파일로 무작위 상태 2만 개와 Esc 규칙마다 그 규칙이 이기는 상태 하나씩을 만든다. 어느 파일을 보든, 편집기가 하나도 없든 Shift+Esc 가 Esc 와 같은 명령을 골라야 한다.
   - 프로젝트 명령 앞뒤로 파일이 바이트까지 같은지, `install.sh` 와 `uninstall.sh` 를 가짜 HOME 으로 돌렸을 때 칸이 들고 나는지도 본다.
   - `test/vscode_when.js`: 같은 검사를 설치된 VSCode 본체의 조건식 분석기와 평가기로 한다(본체 번들에서 그 부분을 떼어 node 로 돌림).
+
+```bash
+bash test/kb_platform.sh
+```
+
+- Shift+Esc 를 걸 수 없는 곳(WSL, 모르는 운영체제)에서도 `install.sh`, `vsc -shift-esc on|off`, `uninstall.sh` 가 이유를 찍고 끝나는지 본다. 맥과 보통 리눅스는 예전처럼 칸을 넣고 뺀다.
+- 맥에서 WSL 을 흉내 낸다(`VSC_TEST_UNAME`, `VSC_TEST_PROC_VERSION`). 임시 HOME 안에서만 돌고, 종료 코드 0 이 전부 통과다.
 - `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS). Ctrl+F5 는 cpptools 1.34.4 가 만드는 것과 같은 터미널 명령 줄을 셸로 돌린다.
 
 ## 구성
@@ -257,6 +264,7 @@ plzrun-vscode-gcc-setup/
 │   └── gen-shift-esc.py     # shift-esc.tsv 만들기 (개발할 때만)
 ├── test/
 │   ├── check.sh
+│   ├── kb_platform.sh       # WSL 등에서 Shift+Esc 안내만 하고 끝까지 가는지
 │   ├── vscode_sim.py
 │   ├── kb_check.py          # Shift+Esc 칸 검사
 │   ├── vscode_when.js       # 설치된 VSCode 의 조건식 분석기로 검사
