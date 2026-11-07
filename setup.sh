@@ -361,7 +361,7 @@ shift_esc() {
         hint "run install.sh again"
         exit 1
     fi
-    kb="$(kb_path)"
+    kb_path; kb="$KB_PATH"
     if [ -z "$kb" ]; then
         err "Shift+Esc cannot be changed here (${KB_WHY})"
         hint "add the Shift+Esc keybindings in that VSCode yourself if you need them (the list: $KB_TSV)"

@@ -30,7 +30,7 @@ KB_LIB="$SHARE_DIR/lib/keybindings.sh"
 [ -f "$KB_LIB" ] || KB_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/keybindings.sh"
 if [ -f "$KB_LIB" ]; then
     . "$KB_LIB"
-    kb="$(kb_path)"
+    kb_path; kb="$KB_PATH"
     if [ -z "$kb" ]; then log "Shift+Esc: nothing to remove (${KB_WHY})"
     else
         kb_update "$kb" /dev/null off
