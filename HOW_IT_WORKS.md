@@ -65,16 +65,17 @@ sw_expert(C/C++) 프로젝트의 **VSCode 컴파일/디버그 설정(`.vscode/`)
 ```
 setup.sh        ← 실제 생성기. 현재 폴더(또는 인자 폴더)에 .vscode/ 생성
 templates/      ← 부어 넣을 tasks.json / launch.json 원본
-lib/            ← keybindings.sh: Shift+Esc 칸 넣기와 빼기
-install.sh      ← 전역 명령 vsc, 'plzrun-vscode-gcc-setup' 설치 + cpptools 확장 + Shift+Esc 켜기
-uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기
+lib/            ← vscpart.sh: VSCode 사용자 파일의 vsc 칸 넣기와 빼기
+                   keybindings.sh: Shift+Esc 칸, settings.sh: C/C++ 코드 조각 끄기 칸
+install.sh      ← 전역 명령 vsc, 'plzrun-vscode-gcc-setup' 설치 + cpptools 확장 + Shift+Esc 켜기 + 코드 조각 끄기
+uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기 + 코드 조각 되돌리기
 ```
 
 ### `setup.sh` 가 하는 일
 1. **자기 위치를 심링크까지 따라가 해석**해서 `templates/`를 찾는다(설치 후 `~/.local/bin`의 명령이 심링크/래퍼여도 원본 templates를 찾도록).
 2. 인자를 읽는다. 값 있는 옵션은 대시 하나, 값 없는 옵션은 대시 둘. 모르는 옵션이나 값은 거리(글자 바꾸기, 넣기, 빼기, 이웃 두 글자 뒤바꾸기)가 가장 가까운 것을 `Did you mean` 으로 알려 주고 아무것도 바꾸지 않는다. 거리 계산은 `awk` 로 한다.
 3. 대상 폴더를 정한다. 폴더를 안 주면 현재 폴더. 다만 현재 폴더에 `main.cpp` 도 `.vscode/` 도 없으면(poj/14216 같은 문제 폴더) 위로 올라가 `vsc.conf` 가 있는 폴더를 쓴다(git 이 `.git` 을 찾는 것과 같다).
-   - `-shift-esc on|off` 는 이 단계 전에 따로 처리한다. PC 전체 설정이라 폴더와 상관없고, 혼자 쓰면 여기서 끝난다.
+   - `-shift-esc on|off`, `-cpp-snippets on|off` 는 이 단계 전에 따로 처리한다. PC 전체 설정이라 폴더와 상관없고, 혼자 쓰면 여기서 끝난다.
 4. `vsc.conf` 를 읽고(없으면 첫 세팅), `--init`, `--ex`, `--single`, `-lang`, `-stdin`, `-stdout` 순으로 새 값을 정한다.
 5. `templates/` 의 `@STD@` 같은 자리를 채워 `tasks.json`, `launch.json` 을 만든다. 내용이 같으면 파일을 건드리지 않는다.
 6. 이 도구가 만들지 않은 `tasks.json`, `launch.json` 이 있으면 `--force` 없이 덮지 않는다. 옛 버전처럼 `.bak` 를 만들지 않는다(사본이 쌓여 헷갈렸다).
@@ -88,11 +89,13 @@ uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기
 3. `~/.local/bin/vsc` 와 `~/.local/bin/plzrun-vscode-gcc-setup` 래퍼 생성 → 둘 다 위 setup.sh를 현재 폴더에서 실행. 같은 이름의 다른 프로그램이 이미 있으면 덮지 않고 알린다.
 4. `ms-vscode.cpptools` 확장 설치(`code --install-extension`).
 5. Shift+Esc = Esc 를 켠다(사용자 `keybindings.json` 에 vsc 칸). 다시 돌려도 칸은 하나, v1.3.0 의 폴더 한정 칸은 PC 전체 칸으로 바꾼다.
-6. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
+6. C/C++ 코드 조각 제안을 끈다(VSCode `settings.json` 에 vsc 칸, `"C_Cpp.suggestSnippets": false`). WSL 은 Remote-WSL 원격 설정 `~/.vscode-server/data/Machine/settings.json` 에 넣는다.
+7. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
 
 ### `uninstall.sh`
 - `~/.local/bin`의 명령 두 개(이 도구 래퍼만) + `~/.local/share/...` 복사본 제거.
 - 사용자 `keybindings.json` 의 Shift+Esc 칸을 뺀다(사용자 항목은 그대로).
+- `settings.json` 의 C/C++ 코드 조각 칸을 뺀다(사용자 설정은 그대로).
 - **cpptools는 범용 확장이라 제거하지 않음**(다른 C++ 작업에 쓰일 수 있으니). 이미 생성된 각 프로젝트의 `.vscode/`도 사용자 자산이라 그대로 둠.
 
 ---
@@ -114,6 +117,24 @@ uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기
 - 목록은 기본 단축키 JSON 덤프(VSCode 의 "Open Default Keyboard Shortcuts (JSON)" 과 같은 파일을 VSCode 판마다 저장한 공개 저장소)와 확장 package.json 에서 `tools/gen-shift-esc.py` 가 만든다. VSCode 판이 바뀌면 다시 만든다.
 - 파일 고치기는 bash 와 awk 만 쓴다. 주석과 문자열을 건너뛰며 배열의 `[` 를 찾고 그 뒤에 칸을 넣는다.
   - 칸 밖 글자는 그대로다. `[` 줄 뒤에 글이 이어지면 줄을 나누고 표시(`[split]`)를 남겨, 뺄 때 다시 붙인다. 끝 줄바꿈이 없던 파일은 없는 채로 둔다.
+
+### C/C++ 코드 조각 끄기 (`lib/settings.sh`, task465)
+- 요청: 중괄호를 치다 `if (condition) { /* code */ }` 가 자주 끼어든다. 그것만 막고 다른 자동 완성은 그대로.
+- 출처: cpptools 1.35.6 의 언어 서버 실행 파일 `bin/cpptools` 안에 코드 조각 표가 들어 있다(`strings` 로 확인).
+  - "if statement" 의 본문은 `if (${1:condition})`, `{`, `${0:/* code */}`, `}` 네 줄이다. 목록에 보이는 이름은 "if" 다.
+  - 같은 표에 21개가 있다. VSCode 1.144 내장 cpp 확장의 스니펫 파일에는 `#region`, `#endregion` 만 있다.
+- 받아들이는 키(VSCode 1.144 본체 확인)
+  - `acceptSelectedSuggestion` 은 목록이 열려 있을 때 Tab(늘), Enter(`editor.acceptSuggestionOnEnter` 기본 "on")에 묶여 있다.
+  - 목록은 글자를 치면 저절로 열린다(`editor.quickSuggestions` 기본). cpptools 가 목록을 여는 글자는 `. " < > : / \ @` 뿐이고 `{`, `}` 는 아니다(언어 서버에 initialize 를 보내 받은 값).
+  - 그래서 `{}` 바로 뒤에 글자를 치다 "if" 가 고른 항목인 채 Enter 나 Tab 이 눌리면, 친 글자가 지워지고 그 자리에 조각이 들어간다.
+- 고른 설정: `"C_Cpp.suggestSnippets": false`. cpptools 확장이 언어 서버에 넘기는 값이고, 언어 서버가 코드 조각을 목록에 넣지 않는다.
+  - 다른 후보와 같이 꺼지는 것
+    - `"[cpp]": {"editor.snippetSuggestions": "none"}`: 사용자 스니펫, `#region` 까지 꺼진다.
+    - `editor.acceptSuggestionOnEnter: "off"`: 모든 언어의 모든 제안을 Enter 로 못 받는다. Tab 으로는 여전히 들어간다.
+    - `editor.quickSuggestions` 끄기: 변수, 함수 이름도 저절로 안 뜬다.
+    - `C_Cpp.autocomplete: "disabled"`: C/C++ 자동 완성 전부.
+  - cpptools 에는 조각 하나만 끄는 설정이 없다. 그래서 cpptools 코드 조각 21개가 같이 꺼지는 것이 가장 좁다.
+- WSL: 단축키와 달리 설정에는 원격 자리(Machine 설정)가 있다. VSCode 서버 폴더 이름은 `.vscode-server`(1.144 제품 설정 `serverDataFolderName`), 원격 설정 파일은 그 아래 `data/Machine/settings.json` 이다. `VSCODE_AGENT_FOLDER` 를 쓰면 그 폴더를 따른다.
 
 ## 4. 사용 흐름
 ```bash

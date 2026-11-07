@@ -12,8 +12,8 @@ C/C++ 문제 폴더에 **VSCode 빌드, 실행, 디버그 세팅(`.vscode/`)을 
 
 ```bash
 cd ~/github/plzrun-vscode-gcc-setup
-bash install.sh      # 명령 vsc, plzrun-vscode-gcc-setup 설치 + cpptools 확장 설치 + Shift+Esc = Esc 켜기
-bash uninstall.sh    # 명령 제거 + Shift+Esc = Esc 끄기 (각 폴더의 .vscode/ 는 그대로)
+bash install.sh      # 명령 vsc, plzrun-vscode-gcc-setup 설치 + cpptools 확장 설치 + Shift+Esc = Esc 켜기 + C/C++ 코드 조각 끄기
+bash uninstall.sh    # 명령 제거 + Shift+Esc = Esc 끄기 + C/C++ 코드 조각 되돌리기 (각 폴더의 .vscode/ 는 그대로)
 ```
 
 - 이미 다른 프로그램이 `~/.local/bin/vsc` 를 쓰고 있으면 덮지 않고 알린다. 그때는 옛 이름으로 쓰면 된다.
@@ -52,6 +52,8 @@ vsc --init                   # 모든 설정을 처음 상태로 (새 문제 시
 vsc --remove                 # vsc 가 만든 파일 지우기 (설정이 꼬였을 때 지우고 다시 vsc)
 vsc -shift-esc on            # Shift+Esc = Esc 켜기 (PC 전체, 폴더와 상관없음)
 vsc -shift-esc off           # Shift+Esc = Esc 끄기
+vsc -cpp-snippets on         # C/C++ 코드 조각(if, for, class 틀) 제안 되돌리기 (PC 전체)
+vsc -cpp-snippets off        # C/C++ 코드 조각 제안 끄기 (install.sh 가 이미 꺼 둔다)
 vsc --help
 ```
 
@@ -219,6 +221,40 @@ vsc: error: unknown option '--shift-esc'
   values:  on off (Shift+Esc works like Esc in all of VSCode, or not)
 ```
 
+## C/C++ 코드 조각 끄기
+
+- 중괄호를 치다 `{}` 바로 뒤에 `if (condition) { /* code */ }` 가 끼어드는 것을 막는다.
+- 이 글은 cpptools(`ms-vscode.cpptools`) 언어 서버가 주는 코드 조각(스니펫) "if" 다.
+  - 원본은 확장 안의 실행 파일 `bin/cpptools` 에 들어 있다. 스니펫 파일이 아니다.
+  - VSCode 내장 cpp 확장의 스니펫 파일(`extensions/cpp/snippets/cpp.code-snippets`)에는 `#region`, `#endregion` 둘만 있다.
+  - 자동 완성 목록이 열린 채 Enter 나 Tab 을 누르면 고른 항목이 들어간다. 그때 치던 글자는 지워지고 조각이 그 자리에 들어간다.
+- `install.sh` 가 `"C_Cpp.suggestSnippets": false` 를 VSCode 설정 파일의 vsc 칸에 넣는다. 그러면 cpptools 가 코드 조각을 목록에 넣지 않는다.
+  - 같이 꺼지는 것: cpptools 코드 조각 21개(if, ifel, ifelif, else, else if, switch, for, forr, forrange, while, do, class, classi, classt, struct, union, main, try, namesp, ifd, ifnd).
+  - 그대로인 것: 변수, 함수, 멤버, 키워드 이름 제안, 사용자 스니펫, `#region`, 다른 언어.
+- 켜고 끄는 곳은 Shift+Esc 와 같다.
+  - 끄기: `install.sh`, `vsc -cpp-snippets off`
+  - 되돌리기: `uninstall.sh`, `vsc -cpp-snippets on`
+  - 프로젝트 명령(`vsc`, `--init`, `--remove`)은 건드리지 않는다.
+- 자리
+  - macOS `~/Library/Application Support/Code/User/settings.json`
+  - Linux `~/.config/Code/User/settings.json`
+  - WSL `~/.vscode-server/data/Machine/settings.json`. Remote-WSL 의 원격 설정이고, WSL 에서 cpptools 는 WSL 쪽에서 돈다. 원격 설정은 Windows 쪽 사용자 설정보다 나중에 읽혀 이긴다. Windows 쪽 파일은 건드리지 않는다.
+- 칸 넣기와 빼기는 Shift+Esc 칸과 같은 코드(`lib/vscpart.sh`)다. 사용자 설정은 한 글자도 바꾸지 않고, 빼면 원래 바이트로 돌아간다.
+  - 칸은 맨 바깥 `{` 바로 뒤에 들어간다. 사용자가 직접 `"C_Cpp.suggestSnippets"` 를 적어 두었으면 뒤쪽인 그쪽이 이기고, vsc 가 그렇다고 알린다.
+  - 파일이 JSON 객체(`{`)로 시작하지 않으면 손대지 않고 알린다.
+
+```
+$ vsc -cpp-snippets on
+vsc: updated /Users/me/Library/Application Support/Code/User/settings.json
+  cpp-snippets: off -> on  (back to VSCode's default)
+  removed the vsc part; your own settings are kept
+
+$ vsc -cpp-snippets off
+vsc: updated /Users/me/Library/Application Support/Code/User/settings.json
+  cpp-snippets: on -> off  (VSCode no longer offers C/C++ code snippets like 'if (condition) {}')
+  names of variables, functions and members are still suggested; your own settings are kept
+```
+
 ## 설정 파일과 지우기
 
 - 설정은 `.vscode/vsc.conf` 하나에 있다. `tasks.json`, `launch.json` 은 명령을 칠 때마다 이 설정으로 다시 만든다. 손으로 고치지 않는다.
@@ -241,10 +277,16 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
 
 ```bash
 bash test/kb_platform.sh
+bash test/cpp_snippets.sh
 ```
 
 - Shift+Esc 를 걸 수 없는 곳(WSL, 모르는 운영체제)에서도 `install.sh`, `vsc -shift-esc on|off`, `uninstall.sh` 가 이유를 찍고 끝나는지 본다. 맥과 보통 리눅스는 예전처럼 칸을 넣고 뺀다.
 - 맥에서 WSL 을 흉내 낸다(`VSC_TEST_UNAME`, `VSC_TEST_PROC_VERSION`). 임시 HOME 안에서만 돌고, 종료 코드 0 이 전부 통과다.
+- `test/cpp_snippets.sh` 는 같은 방식으로 맥, 리눅스, WSL 에서 C/C++ 코드 조각 칸을 본다.
+  - `install.sh` 뒤 `"C_Cpp.suggestSnippets": false`, 사용자 설정 그대로, 두 번 돌려도 같음.
+  - `vsc -cpp-snippets on|off`, `uninstall.sh` 뒤 원래 바이트.
+  - 빈 파일, 한 줄 `{}`, 끝 쉼표, 객체가 아닌 파일, 사용자가 직접 둔 같은 키.
+- `test/check.sh` 도 설정 칸은 시험용 `settings.json`(`VSC_SETTINGS`)에만 쓴다.
 - `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS). Ctrl+F5 는 cpptools 1.34.4 가 만드는 것과 같은 터미널 명령 줄을 셸로 돌린다.
 
 ## 구성
@@ -254,7 +296,9 @@ plzrun-vscode-gcc-setup/
 ├── install.sh / uninstall.sh
 ├── setup.sh                 # 생성기 (vsc 명령의 본체)
 ├── lib/
-│   └── keybindings.sh       # Shift+Esc 칸 넣기와 빼기 (setup.sh, install.sh, uninstall.sh 공용)
+│   ├── vscpart.sh           # VSCode 사용자 파일에 vsc 칸 넣기와 빼기 (아래 둘이 같이 씀)
+│   ├── keybindings.sh       # Shift+Esc 칸 (setup.sh, install.sh, uninstall.sh 공용)
+│   └── settings.sh          # C/C++ 코드 조각 끄기 칸 (C_Cpp.suggestSnippets)
 ├── templates/
 │   ├── tasks.ex.json        # ex 방식 태스크
 │   ├── tasks.single.json    # single 방식 태스크
@@ -265,10 +309,11 @@ plzrun-vscode-gcc-setup/
 ├── test/
 │   ├── check.sh
 │   ├── kb_platform.sh       # WSL 등에서 Shift+Esc 안내만 하고 끝까지 가는지
+│   ├── cpp_snippets.sh      # 맥, 리눅스, WSL 에서 C/C++ 코드 조각 칸 넣기와 빼기
 │   ├── vscode_sim.py
 │   ├── kb_check.py          # Shift+Esc 칸 검사
 │   ├── vscode_when.js       # 설치된 VSCode 의 조건식 분석기로 검사
-│   └── fixtures/            # 사용자 keybindings 예시, v1.3.0 이 넣은 폴더 한정 칸 예시
+│   └── fixtures/            # 사용자 keybindings, settings 예시, v1.3.0 이 넣은 폴더 한정 칸 예시
 ├── HOW_IT_WORKS.md
 ├── LICENSE                  # MIT
 └── README.md
