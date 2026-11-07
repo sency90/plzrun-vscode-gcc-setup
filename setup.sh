@@ -20,8 +20,9 @@ LANGS="c++11 c++14 c++17 c++20 c++23"
 DEF_LANG="c++14"
 DEF_STDIN="in"
 DEF_STDOUT=""          # 빈 값 = 터미널
-VALUE_OPTS="lang stdin stdout shift-esc"
+VALUE_OPTS="lang stdin stdout shift-esc cpp-snippets"
 SE_VALUES="on off"
+CS_VALUES="on off"
 FLAG_OPTS="init remove ex single force help"
 
 say()  { printf '%s: %s\n' "$PROG" "$*"; }
@@ -44,6 +45,9 @@ TPL="$SCRIPT_DIR/templates"
 KB_LIB="$SCRIPT_DIR/lib/keybindings.sh"
 KB_TSV="$TPL/shift-esc.tsv"
 [ -f "$KB_LIB" ] && . "$KB_LIB"
+# C/C++ 코드 조각 제안: settings.json 의 vsc 칸 (lib/settings.sh, task465). PC 전체 설정이라 -cpp-snippets 만 바꾼다
+ST_LIB="$SCRIPT_DIR/lib/settings.sh"
+[ -f "$ST_LIB" ] && . "$ST_LIB"
 
 # ----------------------------------------------------------------------------
 #  문자열 도구
@@ -134,6 +138,8 @@ value_example() {
         stdout) hint "example: $PROG -stdout out2    ($PROG -stdout default goes back to the terminal)" ;;
         shift-esc) hint "example: $PROG -shift-esc on    ($PROG -shift-esc off turns it off)"
                    hint "values:  on off (Shift+Esc works like Esc in all of VSCode, or not)" ;;
+        cpp-snippets) hint "example: $PROG -cpp-snippets on    ($PROG -cpp-snippets off turns them off)"
+                      hint "values:  on off (VSCode offers the C/C++ code snippets like 'if (condition) {}', or not)" ;;
     esac
 }
 
@@ -159,6 +165,9 @@ Options with a value (one dash):
   -shift-esc <on|off>
                    Shift+Esc works like Esc in all of VSCode, or not
                    (for the whole PC, not this folder; see below)
+  -cpp-snippets <on|off>
+                   VSCode offers the C/C++ code snippets (if, for, class ...)
+                   while you type, or not (for the whole PC; see below)
   Give 'default' as the value of -lang, -stdin or -stdout to go back to the default.
 
 Options without a value (two dashes):
@@ -186,6 +195,16 @@ Shift+Esc = Esc is one setting for the whole PC, not for a folder:
 install.sh turns it on and uninstall.sh turns it off. '$PROG', '--init' and
 '--remove' never change it. VSCode reads keybindings only from your user
 keybindings.json, so vsc adds a marked part there; your own entries are kept.
+C/C++ code snippets are one setting for the whole PC, too:
+  $PROG -cpp-snippets off   VSCode stops offering the C/C++ extension's code
+                         snippets (if, for, while, class, struct, main ...),
+                         so Enter or Tab no longer drops in
+                         'if (condition) { /* code */ }'. Names of variables,
+                         functions and members are still offered.
+  $PROG -cpp-snippets on    back to VSCode's default
+install.sh turns them off and uninstall.sh turns them back on. vsc adds
+"C_Cpp.suggestSnippets": false in a marked part of your VSCode settings.json
+(on WSL, the Remote-WSL settings of that Linux); your own settings are kept.
 EOF
 }
 
@@ -221,8 +240,8 @@ missing_value() {
     exit 1
 }
 
-OPT_LANG=""; OPT_STDIN=""; OPT_STDOUT=""; OPT_SE=""
-HAVE_LANG=0; HAVE_STDIN=0; HAVE_STDOUT=0; HAVE_SE=0
+OPT_LANG=""; OPT_STDIN=""; OPT_STDOUT=""; OPT_SE=""; OPT_CS=""
+HAVE_LANG=0; HAVE_STDIN=0; HAVE_STDOUT=0; HAVE_SE=0; HAVE_CS=0
 F_INIT=0; F_REMOVE=0; F_EX=0; F_SINGLE=0; F_FORCE=0; F_HELP=0
 POS_DIR=""; HAVE_DIR=0
 ANY_OPT=0
@@ -233,6 +252,7 @@ set_value() {  # set_value NAME VALUE
         stdin)  OPT_STDIN="$2";  HAVE_STDIN=1 ;;
         stdout) OPT_STDOUT="$2"; HAVE_STDOUT=1 ;;
         shift-esc) OPT_SE="$2"; HAVE_SE=1; return 0 ;;   # 폴더 설정과 따로 (ANY_OPT 아님)
+        cpp-snippets) OPT_CS="$2"; HAVE_CS=1; return 0 ;;
     esac
     ANY_OPT=1
 }
@@ -247,11 +267,11 @@ while [ $# -gt 0 ]; do
             a="$b" ;;
     esac
     case "$a" in
-        -lang|-stdin|-stdout|-shift-esc)
+        -lang|-stdin|-stdout|-shift-esc|-cpp-snippets)
             name="${a#-}"
             if [ $# -eq 0 ] || is_optionlike "$1"; then missing_value "$name"; fi
             set_value "$name" "$1"; shift ;;
-        -lang=*|-stdin=*|-stdout=*|-shift-esc=*)
+        -lang=*|-stdin=*|-stdout=*|-shift-esc=*|-cpp-snippets=*)
             name="${a#-}"; name="${name%%=*}"
             [ -n "${a#*=}" ] || missing_value "$name"
             set_value "$name" "${a#*=}" ;;
@@ -261,7 +281,7 @@ while [ $# -gt 0 ]; do
         --single) F_SINGLE=1; ANY_OPT=1 ;;
         --force)  F_FORCE=1;  ANY_OPT=1 ;;
         --help|-h) F_HELP=1 ;;
-        --lang|--stdin|--stdout|--shift-esc|--lang=*|--stdin=*|--stdout=*|--shift-esc=*)
+        --lang|--stdin|--stdout|--shift-esc|--cpp-snippets|--lang=*|--stdin=*|--stdout=*|--shift-esc=*|--cpp-snippets=*)
             name="${a#--}"; name="${name%%=*}"
             err "unknown option '$a'"
             hint "options with a value use one dash: -$name"
@@ -328,6 +348,15 @@ if [ "$HAVE_SE" -eq 1 ]; then
         err "unknown value for -shift-esc: '$OPT_SE'"
         value_example shift-esc
         print_suggestions "$(closest "$OPT_SE" "$SE_VALUES")" || true
+        exit 1
+    fi
+fi
+if [ "$HAVE_CS" -eq 1 ]; then
+    OPT_CS=$(printf '%s' "$OPT_CS" | tr 'A-Z' 'a-z')
+    if ! in_list "$OPT_CS" "$CS_VALUES"; then
+        err "unknown value for -cpp-snippets: '$OPT_CS'"
+        value_example cpp-snippets
+        print_suggestions "$(closest "$OPT_CS" "$CS_VALUES")" || true
         exit 1
     fi
 fi
@@ -398,8 +427,55 @@ shift_esc() {
             line "removed the vsc part; your own keybindings are kept" ;;
     esac
 }
-if [ "$HAVE_SE" -eq 1 ]; then
-    shift_esc
+# ----------------------------------------------------------------------------
+#  -cpp-snippets on|off : settings.json 의 vsc 칸 (PC 전체, 폴더와 상관없음, task465)
+#    off = 칸을 넣는다("C_Cpp.suggestSnippets": false), on = 칸을 뺀다(VSCode 기본)
+# ----------------------------------------------------------------------------
+cpp_snippets() {
+    local st was
+    if ! command -v st_update >/dev/null 2>&1; then
+        err "C/C++ code snippets cannot be changed: lib/settings.sh is missing"
+        hint "run install.sh again"
+        exit 1
+    fi
+    st_path; st="$ST_PATH"
+    if [ -z "$st" ]; then
+        err "C/C++ code snippets cannot be changed here (${ST_WHY})"
+        hint "set \"$ST_KEY\": false in that VSCode's settings yourself if you need it"
+        exit 1
+    fi
+    st_update "$st" state
+    if [ "$ST_STATUS" = refused ]; then
+        err "could not read $st: $ST_WHY"; hint "the file was not changed"; exit 1
+    fi
+    was="$ST_STATUS"
+    st_update "$st" "$OPT_CS"
+    case "$ST_STATUS" in
+        refused)
+            err "could not change $st: $ST_WHY"
+            hint "the file was not changed"
+            exit 1 ;;
+        unchanged) say "nothing changed in $st (cpp-snippets is already off)" ;;
+        absent)    say "nothing changed in $st (cpp-snippets is already on)" ;;
+        added|updated)
+            say "updated $st"
+            if [ "$was" = off ]; then line "cpp-snippets: off  (the vsc part was out of date)"
+            else line "cpp-snippets: $was -> off  (VSCode no longer offers C/C++ code snippets like 'if (condition) {}')"; fi
+            line "names of variables, functions and members are still suggested; your own settings are kept"
+            [ "$ST_REMOTE" -eq 1 ] && line "(the Remote-WSL settings of this Linux; VSCode on Windows keeps its own settings)" ;;
+        cleared)
+            say "updated $st"
+            line "cpp-snippets: $was -> on  (back to VSCode's default)"
+            line "removed the vsc part; your own settings are kept" ;;
+    esac
+    if [ "$OPT_CS" = off ] && [ "$ST_OWN" -eq 1 ]; then
+        warn "your own \"$ST_KEY\" in $st comes later and wins over the vsc part"
+    fi
+    return 0
+}
+if [ "$HAVE_SE" -eq 1 ] || [ "$HAVE_CS" -eq 1 ]; then
+    [ "$HAVE_SE" -eq 1 ] && shift_esc
+    [ "$HAVE_CS" -eq 1 ] && cpp_snippets
     # 단독으로 쓰면 폴더는 건드리지 않는다
     [ "$ANY_OPT" -eq 0 ] && [ "$HAVE_DIR" -eq 0 ] && exit 0
 fi

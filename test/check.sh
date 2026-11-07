@@ -23,6 +23,9 @@ export PATH="$WORK/bin:$PATH"
 mkdir -p "$WORK/kb"
 export VSC_KEYBINDINGS="$WORK/kb/keybindings.json"
 cp "$HERE/fixtures/keybindings-user.jsonc" "$VSC_KEYBINDINGS"
+# C/C++ 코드 조각 칸도 시험용 settings.json 에만 (자세한 시험은 test/cpp_snippets.sh)
+export VSC_SETTINGS="$WORK/kb/settings.json"
+cp "$HERE/fixtures/settings-user.jsonc" "$VSC_SETTINGS"
 
 # 복사: ex 는 소스와 기존 .vscode, poj 는 소스와 입력 파일만 (빌드 산출물 제외)
 cp -p "$EX_SRC"/*.cpp "$WORK/ex/"
