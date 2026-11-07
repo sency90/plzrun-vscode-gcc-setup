@@ -1,0 +1,15 @@
+// my VSCode settings (comment before the object)
+{
+    "workbench.colorTheme": "Visual Studio Dark - C++",
+    "editor.fontFamily": "Consolas, 'Courier New', monospace",   // a comment after a value
+    "editor.inlineSuggest.enabled": false,
+    /* a block comment { with a brace } */
+    "files.exclude": { "**/*.o": true, "**/pgm_*": true },
+    "vim.normalModeKeyBindingsNonRecursive": [
+        { "before": ["<leader>", "w"], "commands": [":w"] }
+    ],
+    "terminal.integrated.profiles.linux": { "bash": { "path": "/bin/bash", "args": ["-l"] } },
+    "search.exclude": { "// not a comment": true },
+    "[cpp]": { "editor.tabSize": 4 },
+    "C_Cpp.default.compilerPath": "/usr/bin/g++"
+}
