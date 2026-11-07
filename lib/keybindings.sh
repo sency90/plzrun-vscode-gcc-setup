@@ -15,20 +15,26 @@
 KB_BEGIN="// >>> vsc shift+escape"
 KB_END="// <<< vsc shift+escape"
 
-# kb_path : 사용자 keybindings.json 경로. 못 정하면 빈 값과 함께 KB_WHY 에 이유
+# kb_path : 사용자 keybindings.json 경로를 KB_PATH 에 둔다. 못 정하면 KB_PATH 는 빈 값, KB_WHY 에 이유.
+#   부르는 쪽은 kb_path 를 그냥 부르고 KB_PATH 를 읽는다. kb="$(kb_path)" 처럼 명령 치환으로 부르지 않는다:
+#   치환은 서브셸이라 거기서 정한 KB_WHY 가 부르는 쪽에 남지 않고, set -u 에서 "KB_WHY: unbound variable" 로 멈춘다
+#   (task461, WSL 의 install.sh 85행. 맥은 경로가 나와 그 줄을 안 타서 task373 때 안 드러났다).
 kb_path() {
-    KB_WHY=""
-    if [ -n "${VSC_KEYBINDINGS:-}" ]; then printf '%s' "$VSC_KEYBINDINGS"; return 0; fi
-    case "$(uname -s)" in
-        Darwin) printf '%s' "$HOME/Library/Application Support/Code/User/keybindings.json" ;;
+    KB_PATH=""; KB_WHY=""
+    if [ -n "${VSC_KEYBINDINGS:-}" ]; then KB_PATH="$VSC_KEYBINDINGS"; return 0; fi
+    # 시험(test/kb_platform.sh)만 VSC_TEST_UNAME, VSC_TEST_PROC_VERSION 으로 운영체제와 /proc/version 을 바꿔 끼운다(맥에서 WSL 흉내)
+    local os="${VSC_TEST_UNAME:-$(uname -s)}"
+    case "$os" in
+        Darwin) KB_PATH="$HOME/Library/Application Support/Code/User/keybindings.json" ;;
         Linux)
-            if grep -qi microsoft /proc/version 2>/dev/null; then
+            if grep -qi microsoft "${VSC_TEST_PROC_VERSION:-/proc/version}" 2>/dev/null; then
                 KB_WHY="WSL: VSCode keeps its keybindings on the Windows side"
-                return 0
-            fi
-            printf '%s' "${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/keybindings.json" ;;
-        *) KB_WHY="unsupported system $(uname -s)" ;;
+            else
+                KB_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/Code/User/keybindings.json"
+            fi ;;
+        *) KB_WHY="unsupported system $os" ;;
     esac
+    return 0
 }
 
 # kb_update FILE TSV MODE

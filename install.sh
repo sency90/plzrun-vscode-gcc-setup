@@ -80,7 +80,7 @@ fi
 # --- 4. Shift+Esc = Esc (PC 전체, 사용자 keybindings.json 의 vsc 칸) ---
 #   v1.3.0 이 넣은 폴더 한정 칸이 있으면 PC 전체 칸으로 바꾼다. 사용자 항목은 그대로
 . "$SHARE_DIR/lib/keybindings.sh"
-kb="$(kb_path)"
+kb_path; kb="$KB_PATH"
 if [ -z "$kb" ]; then
     warn "Shift+Esc was not set up (${KB_WHY}); add the keybindings in that VSCode yourself if you need them"
     warn "  the list: $SHARE_DIR/templates/shift-esc.tsv"
