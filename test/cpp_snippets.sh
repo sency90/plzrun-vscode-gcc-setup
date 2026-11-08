@@ -46,10 +46,12 @@ try:
     v = json.loads(s) if s.strip() else {}
 except Exception as e:
     print("BAD", e); sys.exit(0)
-print(json.dumps(v.get(sys.argv[2], "MISSING")) if isinstance(v, dict) else "BAD not an object")
+print(("MISSING" if sys.argv[2] not in v else json.dumps(v[sys.argv[2]])) if isinstance(v, dict) else "BAD not an object")
 EOF
 }
-# same_keys FILE ORIG : 사용자 키와 값이 원래 파일과 모두 같다(우리 키 하나만 더해짐)
+# same_keys FILE ORIG : 사용자 키와 값이 원래 파일과 모두 같다(vsc 키만 더해짐)
+#   install.sh 는 EditContext 칸(task469, test/edit_context.sh)도 넣으므로 -cpp-snippets on 뒤에는 그 칸이 남는다.
+#   원래 바이트로 돌아오는지는 uninstall.sh 뒤에 본다.
 same_keys() {
     python3 -I - "$1" "$2" "$HERE" <<'EOF'
 import json, re, sys
@@ -59,8 +61,8 @@ def load(p):
     s = re.sub(r",(\s*[}\]])", r"\1", strip_comments(open(p, encoding="utf-8").read()))
     return json.loads(s) if s.strip() else {}
 a, b = load(sys.argv[1]), load(sys.argv[2])
-a.pop("C_Cpp.suggestSnippets", None)
-print("same" if a == {k: v for k, v in b.items() if k != "C_Cpp.suggestSnippets"} else "differ")
+ours = ("C_Cpp.suggestSnippets", "editor.editContext")   # vsc 가 넣는 키(task469 부터 EditContext 칸도)
+print("same" if {k: v for k, v in a.items() if k not in ours} == {k: v for k, v in b.items() if k not in ours} else "differ")
 EOF
 }
 check_file() {   # check_file NAME FILE 기대값(false|MISSING)
@@ -89,7 +91,8 @@ for plat in mac linux wsl; do
     same_bytes "$plat install.sh 두 번: 파일 그대로" "$S" "$T/$plat-after.json"
     run "$H" "$U" "$PV" "$H/.local/bin/vsc" -cpp-snippets on
     expect "$plat vsc -cpp-snippets on" 0 "cpp-snippets: off -> on" "$S"
-    same_bytes "$plat vsc -cpp-snippets on: 원래 파일과 같음" "$S" "$FX"
+    check_file "$plat vsc -cpp-snippets on" "$S" MISSING
+    r="$(same_keys "$S" "$FX")"; [ "$r" = same ] && ok "$plat vsc -cpp-snippets on: 사용자 설정 그대로" || bad "$plat vsc -cpp-snippets on: 사용자 설정이 바뀜" "$(cat "$S")"
     run "$H" "$U" "$PV" "$H/.local/bin/vsc" -cpp-snippets off
     expect "$plat vsc -cpp-snippets off" 0 "cpp-snippets: on -> off" "$S"
     same_bytes "$plat vsc -cpp-snippets off: install.sh 뒤와 같음" "$S" "$T/$plat-after.json"
