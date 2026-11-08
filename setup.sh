@@ -20,9 +20,10 @@ LANGS="c++11 c++14 c++17 c++20 c++23"
 DEF_LANG="c++14"
 DEF_STDIN="in"
 DEF_STDOUT=""          # 빈 값 = 터미널
-VALUE_OPTS="lang stdin stdout shift-esc cpp-snippets"
+VALUE_OPTS="lang stdin stdout shift-esc cpp-snippets edit-context"
 SE_VALUES="on off"
 CS_VALUES="on off"
+EC_VALUES="on off"
 FLAG_OPTS="init remove ex single force help"
 
 say()  { printf '%s: %s\n' "$PROG" "$*"; }
@@ -45,7 +46,7 @@ TPL="$SCRIPT_DIR/templates"
 KB_LIB="$SCRIPT_DIR/lib/keybindings.sh"
 KB_TSV="$TPL/shift-esc.tsv"
 [ -f "$KB_LIB" ] && . "$KB_LIB"
-# C/C++ 코드 조각 제안: settings.json 의 vsc 칸 (lib/settings.sh, task465). PC 전체 설정이라 -cpp-snippets 만 바꾼다
+# C/C++ 코드 조각 제안과 EditContext: settings.json 의 vsc 칸 (lib/settings.sh, task465, task469). PC 전체 설정이라 -cpp-snippets, -edit-context 만 바꾼다
 ST_LIB="$SCRIPT_DIR/lib/settings.sh"
 [ -f "$ST_LIB" ] && . "$ST_LIB"
 
@@ -140,6 +141,8 @@ value_example() {
                    hint "values:  on off (Shift+Esc works like Esc in all of VSCode, or not)" ;;
         cpp-snippets) hint "example: $PROG -cpp-snippets on    ($PROG -cpp-snippets off turns them off)"
                       hint "values:  on off (VSCode offers the C/C++ code snippets like 'if (condition) {}', or not)" ;;
+        edit-context) hint "example: $PROG -edit-context off    ($PROG -edit-context on turns it back on)"
+                      hint "values:  on off (VSCode takes typing through EditContext, or through a hidden text area)" ;;
     esac
 }
 
@@ -168,6 +171,9 @@ Options with a value (one dash):
   -cpp-snippets <on|off>
                    VSCode offers the C/C++ code snippets (if, for, class ...)
                    while you type, or not (for the whole PC; see below)
+  -edit-context <on|off>
+                   VSCode takes typing through EditContext, or not;
+                   off fixes Korean typing (for the whole PC; see below)
   Give 'default' as the value of -lang, -stdin or -stdout to go back to the default.
 
 Options without a value (two dashes):
@@ -205,6 +211,13 @@ C/C++ code snippets are one setting for the whole PC, too:
 install.sh turns them off and uninstall.sh turns them back on. vsc adds
 "C_Cpp.suggestSnippets": false in a marked part of your VSCode settings.json
 (on WSL, the Remote-WSL settings of that Linux); your own settings are kept.
+EditContext is one setting for the whole PC, too:
+  $PROG -edit-context off   VSCode takes typing through a hidden text area, as it
+                         used to, so typing Korean (IME) does not jump the
+                         cursor or type letters twice in another place.
+  $PROG -edit-context on    back to VSCode's default (EditContext)
+install.sh turns it off and uninstall.sh turns it back on. vsc adds
+"editor.editContext": false in another marked part of the same settings.json.
 EOF
 }
 
@@ -240,8 +253,8 @@ missing_value() {
     exit 1
 }
 
-OPT_LANG=""; OPT_STDIN=""; OPT_STDOUT=""; OPT_SE=""; OPT_CS=""
-HAVE_LANG=0; HAVE_STDIN=0; HAVE_STDOUT=0; HAVE_SE=0; HAVE_CS=0
+OPT_LANG=""; OPT_STDIN=""; OPT_STDOUT=""; OPT_SE=""; OPT_CS=""; OPT_EC=""
+HAVE_LANG=0; HAVE_STDIN=0; HAVE_STDOUT=0; HAVE_SE=0; HAVE_CS=0; HAVE_EC=0
 F_INIT=0; F_REMOVE=0; F_EX=0; F_SINGLE=0; F_FORCE=0; F_HELP=0
 POS_DIR=""; HAVE_DIR=0
 ANY_OPT=0
@@ -253,6 +266,7 @@ set_value() {  # set_value NAME VALUE
         stdout) OPT_STDOUT="$2"; HAVE_STDOUT=1 ;;
         shift-esc) OPT_SE="$2"; HAVE_SE=1; return 0 ;;   # 폴더 설정과 따로 (ANY_OPT 아님)
         cpp-snippets) OPT_CS="$2"; HAVE_CS=1; return 0 ;;
+        edit-context) OPT_EC="$2"; HAVE_EC=1; return 0 ;;
     esac
     ANY_OPT=1
 }
@@ -267,11 +281,11 @@ while [ $# -gt 0 ]; do
             a="$b" ;;
     esac
     case "$a" in
-        -lang|-stdin|-stdout|-shift-esc|-cpp-snippets)
+        -lang|-stdin|-stdout|-shift-esc|-cpp-snippets|-edit-context)
             name="${a#-}"
             if [ $# -eq 0 ] || is_optionlike "$1"; then missing_value "$name"; fi
             set_value "$name" "$1"; shift ;;
-        -lang=*|-stdin=*|-stdout=*|-shift-esc=*|-cpp-snippets=*)
+        -lang=*|-stdin=*|-stdout=*|-shift-esc=*|-cpp-snippets=*|-edit-context=*)
             name="${a#-}"; name="${name%%=*}"
             [ -n "${a#*=}" ] || missing_value "$name"
             set_value "$name" "${a#*=}" ;;
@@ -281,7 +295,7 @@ while [ $# -gt 0 ]; do
         --single) F_SINGLE=1; ANY_OPT=1 ;;
         --force)  F_FORCE=1;  ANY_OPT=1 ;;
         --help|-h) F_HELP=1 ;;
-        --lang|--stdin|--stdout|--shift-esc|--cpp-snippets|--lang=*|--stdin=*|--stdout=*|--shift-esc=*|--cpp-snippets=*)
+        --lang|--stdin|--stdout|--shift-esc|--cpp-snippets|--edit-context|--lang=*|--stdin=*|--stdout=*|--shift-esc=*|--cpp-snippets=*|--edit-context=*)
             name="${a#--}"; name="${name%%=*}"
             err "unknown option '$a'"
             hint "options with a value use one dash: -$name"
@@ -360,6 +374,15 @@ if [ "$HAVE_CS" -eq 1 ]; then
         exit 1
     fi
 fi
+if [ "$HAVE_EC" -eq 1 ]; then
+    OPT_EC=$(printf '%s' "$OPT_EC" | tr 'A-Z' 'a-z')
+    if ! in_list "$OPT_EC" "$EC_VALUES"; then
+        err "unknown value for -edit-context: '$OPT_EC'"
+        value_example edit-context
+        print_suggestions "$(closest "$OPT_EC" "$EC_VALUES")" || true
+        exit 1
+    fi
+fi
 if [ "$F_EX" -eq 1 ] && [ "$F_SINGLE" -eq 1 ]; then
     err "--ex and --single cannot be used together"
     exit 1
@@ -428,54 +451,64 @@ shift_esc() {
     esac
 }
 # ----------------------------------------------------------------------------
-#  -cpp-snippets on|off : settings.json 의 vsc 칸 (PC 전체, 폴더와 상관없음, task465)
-#    off = 칸을 넣는다("C_Cpp.suggestSnippets": false), on = 칸을 뺀다(VSCode 기본)
+#  -cpp-snippets on|off, -edit-context on|off : settings.json 의 vsc 칸 (PC 전체, 폴더와 상관없음)
+#    off = 칸을 넣는다(키를 false 로), on = 칸을 뺀다(VSCode 기본)
+#    cpp-snippets "C_Cpp.suggestSnippets" (task465), edit-context "editor.editContext" (task469)
 # ----------------------------------------------------------------------------
-cpp_snippets() {
-    local st was
+settings_part() {   # settings_part PART VALUE
+    local part="$1" v="$2" st was what offwhy
+    case "$part" in
+        cpp-snippets) what="C/C++ code snippets"
+                      offwhy="VSCode no longer offers C/C++ code snippets like 'if (condition) {}'" ;;
+        edit-context) what="EditContext"
+                      offwhy="typing Korean (IME) no longer jumps the cursor or types letters twice" ;;
+    esac
     if ! command -v st_update >/dev/null 2>&1; then
-        err "C/C++ code snippets cannot be changed: lib/settings.sh is missing"
+        err "$what cannot be changed: lib/settings.sh is missing"
         hint "run install.sh again"
         exit 1
     fi
     st_path; st="$ST_PATH"
     if [ -z "$st" ]; then
-        err "C/C++ code snippets cannot be changed here (${ST_WHY})"
+        st_part "$part"
+        err "$what cannot be changed here (${ST_WHY})"
         hint "set \"$ST_KEY\": false in that VSCode's settings yourself if you need it"
         exit 1
     fi
-    st_update "$st" state
+    st_update "$st" state "$part"
     if [ "$ST_STATUS" = refused ]; then
         err "could not read $st: $ST_WHY"; hint "the file was not changed"; exit 1
     fi
     was="$ST_STATUS"
-    st_update "$st" "$OPT_CS"
+    st_update "$st" "$v" "$part"
     case "$ST_STATUS" in
         refused)
             err "could not change $st: $ST_WHY"
             hint "the file was not changed"
             exit 1 ;;
-        unchanged) say "nothing changed in $st (cpp-snippets is already off)" ;;
-        absent)    say "nothing changed in $st (cpp-snippets is already on)" ;;
+        unchanged) say "nothing changed in $st ($part is already off)" ;;
+        absent)    say "nothing changed in $st ($part is already on)" ;;
         added|updated)
             say "updated $st"
-            if [ "$was" = off ]; then line "cpp-snippets: off  (the vsc part was out of date)"
-            else line "cpp-snippets: $was -> off  (VSCode no longer offers C/C++ code snippets like 'if (condition) {}')"; fi
-            line "names of variables, functions and members are still suggested; your own settings are kept"
+            if [ "$was" = off ]; then line "$part: off  (the vsc part was out of date)"
+            else line "$part: $was -> off  ($offwhy)"; fi
+            [ "$part" = cpp-snippets ] && line "names of variables, functions and members are still suggested; your own settings are kept"
+            [ "$part" = edit-context ] && line "\"$ST_KEY\": false; your own settings are kept"
             [ "$ST_REMOTE" -eq 1 ] && line "(the Remote-WSL settings of this Linux; VSCode on Windows keeps its own settings)" ;;
         cleared)
             say "updated $st"
-            line "cpp-snippets: $was -> on  (back to VSCode's default)"
+            line "$part: $was -> on  (back to VSCode's default)"
             line "removed the vsc part; your own settings are kept" ;;
     esac
-    if [ "$OPT_CS" = off ] && [ "$ST_OWN" -eq 1 ]; then
+    if [ "$v" = off ] && [ "$ST_OWN" -eq 1 ]; then
         warn "your own \"$ST_KEY\" in $st comes later and wins over the vsc part"
     fi
     return 0
 }
-if [ "$HAVE_SE" -eq 1 ] || [ "$HAVE_CS" -eq 1 ]; then
+if [ "$HAVE_SE" -eq 1 ] || [ "$HAVE_CS" -eq 1 ] || [ "$HAVE_EC" -eq 1 ]; then
     [ "$HAVE_SE" -eq 1 ] && shift_esc
-    [ "$HAVE_CS" -eq 1 ] && cpp_snippets
+    [ "$HAVE_EC" -eq 1 ] && settings_part edit-context "$OPT_EC"
+    [ "$HAVE_CS" -eq 1 ] && settings_part cpp-snippets "$OPT_CS"
     # 단독으로 쓰면 폴더는 건드리지 않는다
     [ "$ANY_OPT" -eq 0 ] && [ "$HAVE_DIR" -eq 0 ] && exit 0
 fi
