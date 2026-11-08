@@ -67,15 +67,15 @@ setup.sh        ← 실제 생성기. 현재 폴더(또는 인자 폴더)에 .vs
 templates/      ← 부어 넣을 tasks.json / launch.json 원본
 lib/            ← vscpart.sh: VSCode 사용자 파일의 vsc 칸 넣기와 빼기
                    keybindings.sh: Shift+Esc 칸, settings.sh: C/C++ 코드 조각 끄기 칸
-install.sh      ← 전역 명령 vsc, 'plzrun-vscode-gcc-setup' 설치 + cpptools 확장 + Shift+Esc 켜기 + 코드 조각 끄기
-uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기 + 코드 조각 되돌리기
+install.sh      ← 전역 명령 vsc, 'plzrun-vscode-gcc-setup' 설치 + cpptools 확장 + Shift+Esc 켜기 + 코드 조각 끄기 + EditContext 끄기
+uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기 + 코드 조각, EditContext 되돌리기
 ```
 
 ### `setup.sh` 가 하는 일
 1. **자기 위치를 심링크까지 따라가 해석**해서 `templates/`를 찾는다(설치 후 `~/.local/bin`의 명령이 심링크/래퍼여도 원본 templates를 찾도록).
 2. 인자를 읽는다. 값 있는 옵션은 대시 하나, 값 없는 옵션은 대시 둘. 모르는 옵션이나 값은 거리(글자 바꾸기, 넣기, 빼기, 이웃 두 글자 뒤바꾸기)가 가장 가까운 것을 `Did you mean` 으로 알려 주고 아무것도 바꾸지 않는다. 거리 계산은 `awk` 로 한다.
 3. 대상 폴더를 정한다. 폴더를 안 주면 현재 폴더. 다만 현재 폴더에 `main.cpp` 도 `.vscode/` 도 없으면(poj/14216 같은 문제 폴더) 위로 올라가 `vsc.conf` 가 있는 폴더를 쓴다(git 이 `.git` 을 찾는 것과 같다).
-   - `-shift-esc on|off`, `-cpp-snippets on|off` 는 이 단계 전에 따로 처리한다. PC 전체 설정이라 폴더와 상관없고, 혼자 쓰면 여기서 끝난다.
+   - `-shift-esc on|off`, `-cpp-snippets on|off`, `-edit-context on|off` 는 이 단계 전에 따로 처리한다. PC 전체 설정이라 폴더와 상관없고, 혼자 쓰면 여기서 끝난다.
 4. `vsc.conf` 를 읽고(없으면 첫 세팅), `--init`, `--ex`, `--single`, `-lang`, `-stdin`, `-stdout` 순으로 새 값을 정한다.
 5. `templates/` 의 `@STD@` 같은 자리를 채워 `tasks.json`, `launch.json` 을 만든다. 내용이 같으면 파일을 건드리지 않는다.
 6. 이 도구가 만들지 않은 `tasks.json`, `launch.json` 이 있으면 `--force` 없이 덮지 않는다. 옛 버전처럼 `.bak` 를 만들지 않는다(사본이 쌓여 헷갈렸다).
@@ -90,12 +90,13 @@ uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기 + 코드 조각 
 4. `ms-vscode.cpptools` 확장 설치(`code --install-extension`).
 5. Shift+Esc = Esc 를 켠다(사용자 `keybindings.json` 에 vsc 칸). 다시 돌려도 칸은 하나, v1.3.0 의 폴더 한정 칸은 PC 전체 칸으로 바꾼다.
 6. C/C++ 코드 조각 제안을 끈다(VSCode `settings.json` 에 vsc 칸, `"C_Cpp.suggestSnippets": false`). WSL 은 Remote-WSL 원격 설정 `~/.vscode-server/data/Machine/settings.json` 에 넣는다.
-7. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
+7. EditContext 를 끈다(같은 `settings.json` 의 다른 vsc 칸, `"editor.editContext": false`). 한글 입력 때 커서 튐과 글자 중복을 막는다. WSL 도 같은 원격 설정.
+8. `~/.local/bin`이 PATH에 없으면 추가 방법 안내.
 
 ### `uninstall.sh`
 - `~/.local/bin`의 명령 두 개(이 도구 래퍼만) + `~/.local/share/...` 복사본 제거.
 - 사용자 `keybindings.json` 의 Shift+Esc 칸을 뺀다(사용자 항목은 그대로).
-- `settings.json` 의 C/C++ 코드 조각 칸을 뺀다(사용자 설정은 그대로).
+- `settings.json` 의 C/C++ 코드 조각 칸과 EditContext 칸을 뺀다(사용자 설정은 그대로).
 - **cpptools는 범용 확장이라 제거하지 않음**(다른 C++ 작업에 쓰일 수 있으니). 이미 생성된 각 프로젝트의 `.vscode/`도 사용자 자산이라 그대로 둠.
 
 ---
@@ -135,6 +136,24 @@ uninstall.sh    ← 명령, 복사본 제거 + Shift+Esc 끄기 + 코드 조각 
     - `C_Cpp.autocomplete: "disabled"`: C/C++ 자동 완성 전부.
   - cpptools 에는 조각 하나만 끄는 설정이 없다. 그래서 cpptools 코드 조각 21개가 같이 꺼지는 것이 가장 좁다.
 - WSL: 단축키와 달리 설정에는 원격 자리(Machine 설정)가 있다. VSCode 서버 폴더 이름은 `.vscode-server`(1.144 제품 설정 `serverDataFolderName`), 원격 설정 파일은 그 아래 `data/Machine/settings.json` 이다. `VSCODE_AGENT_FOLDER` 를 쓰면 그 폴더를 따른다.
+
+### 한글 입력: EditContext 끄기 (`lib/settings.sh`, task469)
+- 증상: 한글을 치면 커서가 엉뚱한 곳으로 튀고 글자가 다른 자리에 한 번 더 써진다. 맥에서 가끔, WSL 노트북(Ubuntu 터미널에서 `code .`)에서 자주.
+- 원인: VSCode 편집기는 글자 입력을 브라우저의 EditContext API 로 받는다. 한글처럼 조합해서 치는 입력(IME)에서 이 통로가 커서 자리와 조합 중인 글자를 어긋나게 받는 일이 있다.
+  - 1.144.0 본체: `editContext` 는 편집기 옵션(boolean, 기본 `true`), 옛 이름 `editor.experimentalEditContextEnabled` 값은 새 이름으로 옮겨 읽는다.
+  - 편집기 화면은 이 값이 참이면 EditContext 입력부를, 거짓이면 숨은 textarea 입력부를 만든다(`_instantiateEditContext`). 설정이 바뀌면 그 자리에서 입력부를 새로 만든다(`_updateEditContext`). 그래서 창을 다시 열 필요가 없다.
+- 끄는 설정: `"editor.editContext": false`. 2026-11-08 동혁님 WSL 노트북에서 이것 하나로 고쳐짐을 확인.
+  - 함께 바뀌는 것: 편집기가 글자 입력을 받는 통로 하나. 다른 편집 기능과 설정은 그대로.
+- WSL 자리를 정한 근거(1.144.0 `workbench.desktop.main.js`)
+  - 편집기 옵션은 모두 `editor.<이름>` 으로 `id: "editor"` 설정 묶음에 등록되고, 그 묶음의 scope 는 `6` 이다. 확장 설정 글자를 숫자로 바꾸는 표에서 `"language-overridable"` 이 `6` 이다.
+  - Remote-WSL 원격 설정(`RemoteUserConfiguration`)은 scope `[2,3,4,5,6,7]` 만 읽는다. 빠진 것은 `1`(application) 하나다.
+  - 그래서 `editor.editContext` 는 원격 설정 `~/.vscode-server/data/Machine/settings.json` 에서 먹고, 원격 설정은 Windows 쪽 사용자 설정보다 나중에 읽혀 이긴다. Windows 쪽 파일은 건드리지 않는다.
+  - 이 값은 메인 프로세스가 아니라 창(렌더러)의 편집기가 설정 서비스에서 읽는다(`out/main.js` 에는 이 키가 없다). 창의 설정 서비스에는 원격 설정이 합쳐져 있다.
+- 칸 둘: `settings.json` 에 vsc 칸이 `cpp-snippets`, `edit-context` 둘이다.
+  - `vsc_part` 는 칸을 맨 바깥 `{` 바로 뒤에 넣고, `{` 와 같은 줄에 글이 있으면 그 줄을 갈라 넣은 뒤 칸 처음 줄에 `[split]` 을 단다(빼면 다시 붙인다).
+  - 칸 하나만 빼면 깨진다. 실제로 `{"editor.fontSize": 14}` 한 줄 파일에 cpp-snippets, edit-context 순으로 넣고 cpp-snippets 만 빼면, 사용자 글 `"editor.fontSize": 14}` 가 edit-context 끝 줄(주석)에 붙고, 이어서 edit-context 를 빼면 그 줄째 지워져 `{` 만 남았다. 남은 칸의 끝 쉼표도 틀어진다.
+  - 그래서 `st_update` 는 사본에서 vsc 칸을 위에서부터 모두 뺀 다음, 켜 둘 칸만 정한 순서(`ST_PARTS`: cpp-snippets, edit-context)로 다시 넣고, 바이트가 다를 때만 원래 파일과 바꾼다. 맨 위 칸은 늘 `{` 바로 뒤라 갈라 넣은 줄도 제자리로 붙는다.
+  - 다른 칸이 깨져 있으면(처음 줄만 있고 끝 줄이 없음) 아무것도 바꾸지 않고 알린다.
 
 ## 4. 사용 흐름
 ```bash

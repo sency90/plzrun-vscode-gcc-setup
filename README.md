@@ -12,8 +12,8 @@ C/C++ 문제 폴더에 **VSCode 빌드, 실행, 디버그 세팅(`.vscode/`)을 
 
 ```bash
 cd ~/github/plzrun-vscode-gcc-setup
-bash install.sh      # 명령 vsc, plzrun-vscode-gcc-setup 설치 + cpptools 확장 설치 + Shift+Esc = Esc 켜기 + C/C++ 코드 조각 끄기
-bash uninstall.sh    # 명령 제거 + Shift+Esc = Esc 끄기 + C/C++ 코드 조각 되돌리기 (각 폴더의 .vscode/ 는 그대로)
+bash install.sh      # 명령 vsc, plzrun-vscode-gcc-setup 설치 + cpptools 확장 설치 + Shift+Esc = Esc 켜기 + C/C++ 코드 조각 끄기 + EditContext 끄기(한글 입력)
+bash uninstall.sh    # 명령 제거 + Shift+Esc = Esc 끄기 + C/C++ 코드 조각, EditContext 되돌리기 (각 폴더의 .vscode/ 는 그대로)
 ```
 
 - 이미 다른 프로그램이 `~/.local/bin/vsc` 를 쓰고 있으면 덮지 않고 알린다. 그때는 옛 이름으로 쓰면 된다.
@@ -54,12 +54,14 @@ vsc -shift-esc on            # Shift+Esc = Esc 켜기 (PC 전체, 폴더와 상�
 vsc -shift-esc off           # Shift+Esc = Esc 끄기
 vsc -cpp-snippets on         # C/C++ 코드 조각(if, for, class 틀) 제안 되돌리기 (PC 전체)
 vsc -cpp-snippets off        # C/C++ 코드 조각 제안 끄기 (install.sh 가 이미 꺼 둔다)
+vsc -edit-context off        # EditContext 끄기: 한글 칠 때 커서 튐, 글자 중복 막기 (install.sh 가 이미 꺼 둔다)
+vsc -edit-context on         # EditContext 되돌리기 (VSCode 기본)
 vsc --help
 ```
 
 옵션 규칙은 하나다.
 
-- 값이 붙는 옵션은 대시 하나: `-lang`, `-stdin`, `-stdout`, `-shift-esc`
+- 값이 붙는 옵션은 대시 하나: `-lang`, `-stdin`, `-stdout`, `-shift-esc`, `-cpp-snippets`, `-edit-context`
 - 값이 없는 옵션은 대시 둘: `--init`, `--remove`, `--ex`, `--single`, `--force`, `--help`
 
 그 밖의 규칙:
@@ -255,6 +257,32 @@ vsc: updated /Users/me/Library/Application Support/Code/User/settings.json
   names of variables, functions and members are still suggested; your own settings are kept
 ```
 
+## 한글 입력: EditContext 끄기
+
+- 증상: VSCode 에서 한글을 치면 커서가 엉뚱한 곳으로 튀고, 글자가 다른 자리에 한 번 더 써진다.
+  - 맥에서 가끔, Windows 노트북의 WSL(Ubuntu 터미널에서 `code .` 로 연 VSCode)에서 자주 겪었다.
+- 원인: 지금 VSCode 편집기는 글자 입력을 브라우저의 EditContext API 로 받는다(`"editor.editContext"`, 1.144.0 기본값 `true`).
+  - 한글처럼 글자를 조합해서 치는 입력(IME)에서 이 통로가 커서 자리와 조합 중인 글자를 어긋나게 받는 일이 있다.
+- 끄는 설정: `"editor.editContext": false`. 편집기가 예전처럼 숨은 textarea 로 글자를 받는다.
+  - 2026-11-08 WSL 노트북에서 이 설정 하나로 고쳐지는 것을 확인했다.
+  - 함께 바뀌는 것: 편집기가 글자 입력을 받는 통로 하나. 다른 편집 기능과 설정은 그대로다.
+- 켜고 끄는 곳은 C/C++ 코드 조각과 같다.
+  - 끄기: `install.sh`, `vsc -edit-context off`
+  - 되돌리기: `uninstall.sh`, `vsc -edit-context on`
+- 자리도 C/C++ 코드 조각과 같은 `settings.json` 이다. 칸만 따로다(`// >>> vsc edit-context`).
+  - WSL 도 Remote-WSL 원격 설정 `~/.vscode-server/data/Machine/settings.json` 에 넣는다. Windows 쪽 파일은 건드리지 않는다.
+  - 근거: `editor.*` 설정은 scope 가 `language-overridable` 이다. VSCode 는 원격 설정에서 scope 가 `application` 인 설정만 버린다(1.144.0 본체에서 확인, HOW_IT_WORKS 참고).
+- 칸이 둘이라, 바꿀 때마다 vsc 칸을 위에서부터 모두 뺀 다음 켜 둘 칸만 정한 순서로 다시 넣는다.
+  - 어느 순서로 켜고 꺼도 쉼표가 맞고, 둘 다 빼면 원래 바이트로 돌아간다.
+- VSCode 가 떠 있어도 파일이 바뀌는 즉시 열린 편집기의 입력 통로가 바뀐다. 창을 다시 열 필요가 없다(1.144.0 본체의 편집기 화면이 설정 변경 때 입력 통로를 새로 만든다).
+
+```
+$ vsc -edit-context off
+vsc: updated /Users/me/Library/Application Support/Code/User/settings.json
+  edit-context: on -> off  (typing Korean (IME) no longer jumps the cursor or types letters twice)
+  "editor.editContext": false; your own settings are kept
+```
+
 ## 설정 파일과 지우기
 
 - 설정은 `.vscode/vsc.conf` 하나에 있다. `tasks.json`, `launch.json` 은 명령을 칠 때마다 이 설정으로 다시 만든다. 손으로 고치지 않는다.
@@ -278,6 +306,7 @@ bash test/check.sh <ex 문제 폴더> <poj 문제 폴더>
 ```bash
 bash test/kb_platform.sh
 bash test/cpp_snippets.sh
+bash test/edit_context.sh
 ```
 
 - Shift+Esc 를 걸 수 없는 곳(WSL, 모르는 운영체제)에서도 `install.sh`, `vsc -shift-esc on|off`, `uninstall.sh` 가 이유를 찍고 끝나는지 본다. 맥과 보통 리눅스는 예전처럼 칸을 넣고 뺀다.
@@ -286,6 +315,9 @@ bash test/cpp_snippets.sh
   - `install.sh` 뒤 `"C_Cpp.suggestSnippets": false`, 사용자 설정 그대로, 두 번 돌려도 같음.
   - `vsc -cpp-snippets on|off`, `uninstall.sh` 뒤 원래 바이트.
   - 빈 파일, 한 줄 `{}`, 끝 쉼표, 객체가 아닌 파일, 사용자가 직접 둔 같은 키.
+- `test/edit_context.sh` 는 같은 방식으로 EditContext 칸을 본다.
+  - `install.sh` 뒤 두 키 다 `false`(끝 쉼표 없는 엄격한 JSON), `vsc -edit-context on|off`, `uninstall.sh` 뒤 원래 바이트.
+  - 칸 둘을 넣고 빼는 네 가지 순서를 여섯 가지 파일 모양에서. v1.5.0 이 넣은 코드 조각 칸만 있는 파일.
 - `test/check.sh` 도 설정 칸은 시험용 `settings.json`(`VSC_SETTINGS`)에만 쓴다.
 - `test/vscode_sim.py` 가 VSCode 처럼 변수를 바꿔 태스크를 돌리고, F5 는 cpptools 의 `lldb-mi` 를 같은 순서로 몰아 입력이 들어가는지 본다(macOS). Ctrl+F5 는 cpptools 1.34.4 가 만드는 것과 같은 터미널 명령 줄을 셸로 돌린다.
 
@@ -298,7 +330,7 @@ plzrun-vscode-gcc-setup/
 ├── lib/
 │   ├── vscpart.sh           # VSCode 사용자 파일에 vsc 칸 넣기와 빼기 (아래 둘이 같이 씀)
 │   ├── keybindings.sh       # Shift+Esc 칸 (setup.sh, install.sh, uninstall.sh 공용)
-│   └── settings.sh          # C/C++ 코드 조각 끄기 칸 (C_Cpp.suggestSnippets)
+│   └── settings.sh          # settings.json 칸 둘: C/C++ 코드 조각(C_Cpp.suggestSnippets), EditContext(editor.editContext)
 ├── templates/
 │   ├── tasks.ex.json        # ex 방식 태스크
 │   ├── tasks.single.json    # single 방식 태스크
@@ -310,6 +342,7 @@ plzrun-vscode-gcc-setup/
 │   ├── check.sh
 │   ├── kb_platform.sh       # WSL 등에서 Shift+Esc 안내만 하고 끝까지 가는지
 │   ├── cpp_snippets.sh      # 맥, 리눅스, WSL 에서 C/C++ 코드 조각 칸 넣기와 빼기
+│   ├── edit_context.sh      # 같은 곳에서 EditContext 칸, 칸 둘의 순서
 │   ├── vscode_sim.py
 │   ├── kb_check.py          # Shift+Esc 칸 검사
 │   ├── vscode_when.js       # 설치된 VSCode 의 조건식 분석기로 검사

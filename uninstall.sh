@@ -6,7 +6,7 @@
 #  - cpptools 확장은 범용 확장이라 제거하지 않음(원하면 수동)
 #  - 사용자 keybindings.json 의 Shift+Esc 칸(vsc 가 넣은 부분)만 뺀다. 칸을 빼는 곳은
 #    여기와 vsc -shift-esc off 뿐이다(폴더별 vsc --remove 는 칸을 건드리지 않는다)
-#  - settings.json 의 C/C++ 코드 조각 칸(vsc 가 넣은 "C_Cpp.suggestSnippets": false)만 뺀다
+#  - settings.json 의 vsc 칸 두 개(vsc 가 넣은 "C_Cpp.suggestSnippets": false, "editor.editContext": false)만 뺀다
 #  - 이미 각 프로젝트에 생성된 .vscode 는 사용자 자산이라 건드리지 않음
 #    (프로젝트마다 지우려면 그 폴더에서 vsc --remove)
 # ============================================================================
@@ -42,19 +42,25 @@ if [ -f "$KB_LIB" ]; then
         esac
     fi
 fi
-# C/C++ 코드 조각: settings.json 의 vsc 칸을 뺀다(사용자 설정은 그대로)
+# C/C++ 코드 조각, EditContext: settings.json 의 vsc 칸을 뺀다(사용자 설정은 그대로)
 ST_LIB="$SHARE_DIR/lib/settings.sh"
 [ -f "$ST_LIB" ] || ST_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/settings.sh"
 if [ -f "$ST_LIB" ]; then
     . "$ST_LIB"
     st_path; st="$ST_PATH"
-    if [ -z "$st" ]; then log "C/C++ code snippets: nothing to remove (${ST_WHY})"
+    if [ -z "$st" ]; then log "C/C++ code snippets and EditContext: nothing to remove (${ST_WHY})"
     else
-        st_update "$st" on
+        st_update "$st" on cpp-snippets
         case "$ST_STATUS" in
             cleared) log "C/C++ code snippets are back to the VSCode default (removed the vsc part from $st; your own settings are kept)" ;;
             refused) warn "could not remove the C/C++ code snippets part from $st: $ST_WHY (file not changed)" ;;
             *)       log "C/C++ code snippets: no vsc part in $st (skipped)" ;;
+        esac
+        st_update "$st" on edit-context
+        case "$ST_STATUS" in
+            cleared) log "EditContext is back to the VSCode default (removed the vsc part from $st; your own settings are kept)" ;;
+            refused) warn "could not remove the EditContext part from $st: $ST_WHY (file not changed)" ;;
+            *)       log "EditContext: no vsc part in $st (skipped)" ;;
         esac
     fi
 fi

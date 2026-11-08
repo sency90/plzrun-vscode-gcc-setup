@@ -9,6 +9,9 @@
 #  - C/C++ 코드 조각 제안(cpptools 의 if, for, class 틀)을 끈다("C_Cpp.suggestSnippets": false 를
 #    VSCode settings.json 의 vsc 칸에, WSL 은 Remote-WSL 원격 설정에). 되돌리기는 vsc -cpp-snippets on
 #    또는 uninstall.sh. 변수, 함수, 멤버 이름 제안과 다른 언어는 그대로
+#  - 한글(IME)을 칠 때 커서가 튀고 글자가 두 번 써지는 것을 막는다("editor.editContext": false 를
+#    같은 settings.json 의 다른 vsc 칸에, WSL 도 같은 원격 설정에). 되돌리기는 vsc -edit-context on
+#    또는 uninstall.sh
 #  가정: VSCode + `code` CLI 사용 가능 (Windows 는 Remote-WSL 안에서 실행)
 #  사용법:  bash install.sh
 #  출력은 영어 (한글이 깨지는 터미널 대비)
@@ -101,15 +104,16 @@ else
     esac
 fi
 
-# --- 5. C/C++ 코드 조각 제안 끄기 (settings.json 의 vsc 칸, lib/settings.sh) ---
-#   중괄호를 치다 "if (condition) { /* code */ }" 가 끼어드는 것을 막는다(task465)
+# --- 5. settings.json 의 vsc 칸 두 개 (lib/settings.sh) ---
+#   cpp-snippets : 중괄호를 치다 "if (condition) { /* code */ }" 가 끼어드는 것을 막는다(task465)
+#   edit-context : 한글을 치다 커서가 튀고 글자가 두 번 써지는 것을 막는다(task469)
 . "$SHARE_DIR/lib/settings.sh"
 st_path; st="$ST_PATH"
 if [ -z "$st" ]; then
-    warn "C/C++ code snippets were not turned off (${ST_WHY}); set \"$ST_KEY\": false in that VSCode yourself"
+    warn "C/C++ code snippets and EditContext were not turned off (${ST_WHY}); set \"C_Cpp.suggestSnippets\": false and \"editor.editContext\": false in that VSCode yourself"
 else
     where=""; [ "$ST_REMOTE" -eq 1 ] && where=" (the Remote-WSL settings of this Linux; the Windows side is not changed)"
-    st_update "$st" off
+    st_update "$st" off cpp-snippets
     case "$ST_STATUS" in
         added)     log "C/C++ code snippets (if, for, class ...) are off: VSCode no longer offers them while you type (added the vsc part to $st)$where" ;;
         updated)   log "C/C++ code snippets (if, for, class ...) are off (rewrote the vsc part in $st)$where" ;;
@@ -119,6 +123,18 @@ else
     case "$ST_STATUS" in
         added|updated|unchanged)
             log "  names of variables, functions and members are still suggested; other languages are not changed"
+            if [ "$ST_OWN" -eq 1 ]; then warn "your own \"$ST_KEY\" in $st comes later and wins over the vsc part"; fi ;;
+    esac
+    st_update "$st" off edit-context
+    case "$ST_STATUS" in
+        added)     log "EditContext is off: typing Korean (IME) no longer jumps the cursor or types letters twice (added the vsc part to $st)$where" ;;
+        updated)   log "EditContext is off (rewrote the vsc part in $st)$where" ;;
+        unchanged) log "EditContext is off already ($st not changed)" ;;
+        refused)   warn "EditContext was not turned off: $ST_WHY ($st was not changed)" ;;
+    esac
+    case "$ST_STATUS" in
+        added|updated|unchanged)
+            log "  (\"editor.editContext\": false; VSCode takes typing through a hidden text area, as it used to)"
             if [ "$ST_OWN" -eq 1 ]; then warn "your own \"$ST_KEY\" in $st comes later and wins over the vsc part"; fi ;;
     esac
 fi
@@ -136,4 +152,5 @@ echo "   use:       in a problem folder, run  $SHORT_NAME   (same as $CMD_NAME)"
 echo "   help:      $SHORT_NAME --help"
 echo "   Shift+Esc: $SHORT_NAME -shift-esc off   turns Shift+Esc = Esc off ($SHORT_NAME -shift-esc on turns it back on)"
 echo "   snippets:  $SHORT_NAME -cpp-snippets on   brings the C/C++ code snippets back ($SHORT_NAME -cpp-snippets off turns them off)"
+echo "   Korean:    $SHORT_NAME -edit-context on   turns EditContext back on ($SHORT_NAME -edit-context off turns it off again)"
 echo "   uninstall: bash uninstall.sh"
